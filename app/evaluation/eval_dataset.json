@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "question": "What is the maximum retention period for client contract records?",
+    "expected_source": "data_privacy_policy.pdf",
+    "expected_keywords": ["seven", "7", "years", "retention"]
+  },
+  {
+    "id": 2,
+    "question": "How many days of paid annual leave do full-time employees receive?",
+    "expected_source": "leave_policy.pdf",
+    "expected_keywords": ["twenty", "20", "annual leave"]
+  },
+  {
+    "id": 3,
+    "question": "How quickly must security incidents be reported to the DPO?",
+    "expected_source": "data_privacy_policy.pdf",
+    "expected_keywords": ["twenty-four", "24", "hours"]
+  },
+  {
+    "id": 4,
+    "question": "How many remote work days per week are allowed?",
+    "expected_source": "remote_work_policy.pdf",
+    "expected_keywords": ["three", "3", "days"]
+  },
+  {
+    "id": 5,
+    "question": "What is the gift value threshold requiring approval?",
+    "expected_source": "code_of_conduct.pdf",
+    "expected_keywords": ["2000", "INR", "gift"]
+  },
+  {
+    "id": 6,
+    "question": "When does health insurance coverage begin?",
+    "expected_source": "hr_handbook_excerpt.pdf",
+    "expected_keywords": ["sixty", "60", "days", "insurance"]
+  },
+  {
+    "id": 7,
+    "question": "What is the sick leave entitlement per year?",
+    "expected_source": "leave_policy.pdf",
+    "expected_keywords": ["twelve", "12", "sick"]
+  },
+  {
+    "id": 8,
+    "question": "What are the core collaboration hours for remote workers?",
+    "expected_source": "remote_work_policy.pdf",
+    "expected_keywords": ["10:00", "4:00", "IST"]
+  },
+  {
+    "id": 9,
+    "question": "कर्मचारियों को आपातकालीन संपर्क विवरण कब तक अपडेट करना होता है?",
+    "expected_source": "multilingual_notice.pdf",
+    "expected_keywords": ["31", "दिसंबर", "December"]
+  },
+  {
+    "id": 10,
+    "question": "What is the professional development budget per employee?",
+    "expected_source": "hr_handbook_excerpt.pdf",
+    "expected_keywords": ["25000", "25,000", "development"]
+  }
+]
