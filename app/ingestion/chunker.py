@@ -9,20 +9,14 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.utils.config import settings
 from app.utils.logging_config import logger
 
-SUPPORTED_LANGUAGES = {"en", "hi", "gu", "mr"}
+SUPPORTED_LANGUAGES = {"en", "hi"}
 
 
 def detect_language(text: str) -> str:
     """Heuristic language detection for chunk metadata."""
     sample = text[:500]
-    if re.search(r"[\u0A80-\u0AFF]", sample):
-        return "gu"
     if re.search(r"[\u0900-\u097F]", sample):
         return "hi"
-    if re.search(r"[\u0900-\u097F]", sample) and re.search(
-        r"(मराठी|महाराष्ट्र)", sample
-    ):
-        return "mr"
     return "en"
 
 
@@ -64,9 +58,13 @@ def chunk_pages(
 
         for split in splits:
             chunk_counter += 1
+            # Prefix helps embeddings match queries that name a document or topic.
+            chunk_text = (
+                f"Document: {page['source_file']} (page {page['page_number']}). {split}"
+            )
             chunks.append(
                 {
-                    "text": split,
+                    "text": chunk_text,
                     "metadata": {
                         "source_file": page["source_file"],
                         "page_number": page["page_number"],

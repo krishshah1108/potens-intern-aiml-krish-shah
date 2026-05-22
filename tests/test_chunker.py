@@ -18,7 +18,7 @@ def test_chunk_metadata_fields():
     assert meta["page_number"] == 1
     assert "chunk_id" in meta
     assert "document_id" in meta
-    assert meta["language"] in {"en", "hi", "gu", "mr"}
+    assert meta["language"] in {"en", "hi"}
 
 
 def test_document_id_stable():

@@ -1,10 +1,27 @@
 """PDF text extraction with page-level granularity."""
 
+import re
 from pathlib import Path
 
 from pypdf import PdfReader
 
 from app.utils.logging_config import logger
+
+# Many PDFs (including Word exports) place each word on its own line; pypdf
+# preserves those breaks and destroys embedding quality unless normalized.
+_MULTI_SPACE = re.compile(r"[ \t\u00a0]+")
+_MULTI_NEWLINE = re.compile(r"\n{2,}")
+
+
+def normalize_pdf_text(text: str) -> str:
+    """Collapse layout artifacts so chunks embed as continuous prose."""
+    if not text:
+        return ""
+    text = text.replace("\ufffd", " ")
+    text = _MULTI_NEWLINE.sub("\n", text)
+    text = text.replace("\n", " ")
+    text = _MULTI_SPACE.sub(" ", text)
+    return text.strip()
 
 
 def load_pdf_pages(file_path: Path) -> list[dict]:
@@ -18,7 +35,7 @@ def load_pdf_pages(file_path: Path) -> list[dict]:
     source_file = file_path.name
 
     for idx, page in enumerate(reader.pages, start=1):
-        text = (page.extract_text() or "").strip()
+        text = normalize_pdf_text(page.extract_text() or "")
         if not text:
             logger.warning("Empty page %s in %s", idx, source_file)
             continue

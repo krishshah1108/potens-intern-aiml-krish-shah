@@ -30,6 +30,18 @@ def answer_question(question: str) -> dict:
 
     all_chunks = retrieve(retrieval_query)
     relevant_chunks = filter_by_threshold(all_chunks)
+
+    # Borderline matches (e.g. internship PDF rule phrasing) still get grounded context.
+    if not relevant_chunks and all_chunks:
+        best_sim = all_chunks[0]["similarity"]
+        if best_sim >= 0.35:
+            relevant_chunks = all_chunks[:3]
+            logger.info(
+                "Using top %d chunks below threshold (best similarity=%.3f)",
+                len(relevant_chunks),
+                best_sim,
+            )
+
     confidence = compute_confidence(relevant_chunks if relevant_chunks else all_chunks)
 
     citations = format_citations(relevant_chunks if relevant_chunks else [])

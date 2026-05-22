@@ -99,7 +99,7 @@ with st.sidebar:
 # Main
 st.title("Potens Document Q&A")
 st.caption(
-    "Grounded answers with citations · English · Hindi · Gujarati · Marathi"
+    "Grounded answers with citations · English · Hindi"
 )
 
 tab_ask, tab_contradict = st.tabs(["Ask a question", "Contradiction analysis"])
@@ -107,7 +107,7 @@ tab_ask, tab_contradict = st.tabs(["Ask a question", "Contradiction analysis"])
 with tab_ask:
     question = st.text_area(
         "Your question",
-        placeholder="Ask in English, Hindi, Gujarati, or Marathi...",
+        placeholder="Ask in English or Hindi...",
         height=100,
     )
     if st.button("Get answer", type="primary", disabled=not question.strip()):
