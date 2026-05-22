@@ -15,6 +15,7 @@ _TERM_BOOSTS: tuple[tuple[str, str], ...] = (
 _TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9-]{1,}")
 
 
+
 def _token_set(text: str) -> set[str]:
     return set(_TOKEN_RE.findall(text.lower()))
 
