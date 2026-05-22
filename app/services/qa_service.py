@@ -98,6 +98,7 @@ def _serialize_chunks(chunks: list[dict]) -> list[dict]:
             "source_file": c.get("metadata", {}).get("source_file"),
             "page_number": c.get("metadata", {}).get("page_number"),
             "similarity": c.get("similarity"),
+            "embedding_similarity": c.get("embedding_similarity"),
             "text_preview": (c.get("text") or "")[:200],
         }
         for c in chunks

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     documents_dir: str = "documents"
     collection_name: str = "potens_docs"
     top_k: int = 5
+    retrieval_candidates: int = 20
     similarity_threshold: float = 0.45
     chunk_size: int = 800
     chunk_overlap: int = 150

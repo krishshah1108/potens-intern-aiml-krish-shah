@@ -273,18 +273,44 @@ No reranking or hybrid BM25 — intentional simplicity for reliability within as
 
 ## Multilingual Support
 
-**Supported:** English (`en`) and Hindi (`hi`)
+**Supported in this build:** English (`en`) and Hindi (`hi`) only.
+
+### Hackathon requirement (from take-home rules PDF)
+
+The Potens internship brief expects:
+
+> *A multilingual flow: a query in one language returns an answer in the same language. A translation step at the boundary is acceptable for the 24-hour version.*
+
+**How this repo satisfies that:**
+
+| Step | Implementation |
+|------|----------------|
+| Detect query language | `langdetect` in `app/services/language.py` |
+| Retrieval (boundary) | Query translated to **English** before embedding search |
+| Answer | Gemini prompted to respond in the **original query language** (`get_answer_language_instruction`) |
+
+So Hindi in → Hindi out is supported; an English translation step for retrieval is explicit and allowed by the rules.
+
+### English documents, non-English queries (you are mostly correct)
+
+| Layer | Language | Notes |
+|-------|----------|--------|
+| **Indexed PDFs** | Mostly **English** | Policy samples and `Potens_Intern_Take_Home_2026.pdf` are English prose. `multilingual_notice.pdf` also includes a **Hindi** section for testing Devanagari in the corpus. |
+| **User questions** | **English or Hindi** | Ask in either; the answer is generated in the same language as the question. |
+| **Other languages** (Gujarati, Marathi, etc.) | Not first-class in v1 | The brief’s frontend task mentions “English + one Indian language” for UI; this Q&A API intentionally scopes to **en/hi** for the 24-hour build. Other scripts may be mapped to Hindi for the translation boundary only. |
+
+**Practical implication:** Retrieval still works best when chunk text is English (translate query → English → search English chunks). Hindi **answers** are reliable when the retrieved context is English and the LLM is asked to reply in Hindi. For Hindi **source** text in PDFs, include real Devanagari in the document (as in `multilingual_notice.pdf`) and re-ingest.
 
 **Approach (intentionally simple):**
 1. Detect query language
 2. Translate query to English for retrieval
 3. Generate answer in the original language
 
-This translation-boundary approach was chosen for **reliability and simplicity** within assignment time constraints. Multilingual embeddings still help, but English retrieval queries improve consistency for policy-style documents primarily written in English.
+Multilingual embeddings (`paraphrase-multilingual-MiniLM-L12-v2`) still help cross-lingual similarity, but the English retrieval query keeps policy-style search consistent.
 
-**Uploaded PDFs (e.g. `Potens_Intern_Take_Home_2026.pdf`):** These are text-based, not scanned images — OCR is usually **not** required. Many exports still break each word onto a new line; the ingestion pipeline normalizes whitespace before chunking. After adding or replacing a PDF, **re-ingest** (`POST /ingest` or restart `main.py` on an empty store) so chunks are rebuilt.
+---
 
-### PDF ingestion and retrieval fixes (May 2026)
+### PDF ingestion fixes (May 2026)
 
 We improved answer quality on uploaded assignment PDFs (e.g. `Potens_Intern_Take_Home_2026.pdf`) and policy docs:
 
@@ -293,13 +319,29 @@ We improved answer quality on uploaded assignment PDFs (e.g. `Potens_Intern_Take
 | **Whitespace normalization** after `pypdf` extract | `app/ingestion/pdf_loader.py` | Word-per-line PDF exports produced unusable chunks and weak embeddings |
 | **Document/page prefix on each chunk** | `app/ingestion/chunker.py` | Helps semantic search match questions that refer to a file or section |
 | **Borderline retrieval fallback** (top 3 chunks if best similarity ≥ 0.35) | `app/services/qa_service.py` | Stops valid but slightly low-scoring chunks from triggering a refusal |
-| **English + Hindi only** (removed Gujarati/Marathi) | `app/services/language.py`, UI, tests | Focus on `en` / `hi` per project scope |
+| **English + Hindi only** (removed Gujarati/Marathi) | `app/services/language.py`, UI, tests | Focus on `en` / `hi` per 24-hour Q&A scope |
 | **Longer, sectioned sample PDFs + real Hindi notice** | `scripts/generate_sample_documents.py`, `documents/*.pdf` | More realistic policy text; Devanagari in `multilingual_notice.pdf` |
 | **Pinned heavy deps + staged Windows install** | `requirements.txt`, `scripts/run_setup.ps1` | Faster, more reliable `pip install` on Windows |
 
 **After pulling these changes:** restart `python main.py` and run **Re-ingest all documents** (or `POST /ingest`) so ChromaDB is rebuilt with normalized text—not just restart without re-ingest.
 
 **Wrong answers are usually not the LLM ignoring the PDF**—check the Streamlit retrieval debug panel first (similarity scores and chunk previews). Common causes: stale index, broken PDF layout before normalization, or conflicting numbers across docs (e.g. 20 vs 18 annual leave days in `leave_policy.pdf` vs `hr_handbook_excerpt.pdf`).
+
+**Uploaded PDFs (e.g. `Potens_Intern_Take_Home_2026.pdf`):** Text-based (OCR usually not required). Re-ingest after layout/normalization changes.
+
+---
+
+### Hybrid retrieval fix (May 2026)
+
+Some questions (e.g. *“what shall be the repo name while Shipping it on GitHub”*) had the right text in the index but **low embedding similarity** (~0.19), so the API refused before the LLM ran.
+
+| Change | File(s) | Why |
+|--------|---------|-----|
+| **Hybrid re-rank** | `app/rag/rerank.py`, `app/rag/retriever.py` | Fetch 20 candidates, re-score with embedding + keyword overlap (`github`, `repo`, `potens-intern`, …), return top 5 |
+| **Debug: embedding vs hybrid score** | `app/services/qa_service.py`, `streamlit_app/app.py` | Retrieval panel shows both when re-rank is applied |
+| **Smoke tests** | `scripts/retrieval_smoke_test.py` | Scripted checks including take-home GitHub repo naming |
+
+**After pulling:** restart `python main.py` (re-ingest not required for re-rank alone).
 
 ---
 

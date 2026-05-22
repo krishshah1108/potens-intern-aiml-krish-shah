@@ -146,10 +146,13 @@ with tab_ask:
             if not chunks:
                 st.write("No chunks retrieved.")
             for ch in chunks:
+                emb = ch.get("embedding_similarity")
+                sim_line = f"Similarity: **{ch.get('similarity', 0):.3f}**"
+                if emb is not None:
+                    sim_line += f" (embedding: {emb:.3f})"
                 st.markdown(
                     f"**{ch.get('source_file')}** · Page {ch.get('page_number')} · "
-                    f"Chunk `{ch.get('chunk_id')}` · "
-                    f"Similarity: **{ch.get('similarity', 0):.3f}**"
+                    f"Chunk `{ch.get('chunk_id')}` · {sim_line}"
                 )
                 st.text(ch.get("text_preview", ""))
                 st.divider()
