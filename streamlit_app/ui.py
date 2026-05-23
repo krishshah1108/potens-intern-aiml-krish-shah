@@ -1,14 +1,19 @@
 """
-Potens Document Q&A — Streamlit UI (full pipeline transparency)
+Potens Document Q&A — Streamlit UI
 
-Run: streamlit run streamlit_app/app.py
+Run: streamlit run streamlit_app/ui.py
 Requires: python main.py
 """
 
 import html
 import json
 import os
+import sys
 from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 import httpx
 import streamlit as st
@@ -38,7 +43,6 @@ st.markdown(
         font-size: 1.05rem;
         line-height: 1.65;
         color: #212529;
-        box-shadow: 0 2px 8px rgba(25, 113, 194, 0.12);
     }
     .answer-label {
         font-size: 0.75rem;
@@ -55,13 +59,6 @@ st.markdown(
         margin: 0.5rem 0;
         font-size: 0.9rem;
     }
-    .chunk-box {
-        background: #fafafa;
-        border: 1px solid #dee2e6;
-        padding: 0.6rem 0.8rem;
-        margin: 0.4rem 0;
-        border-radius: 4px;
-    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -69,14 +66,13 @@ st.markdown(
 
 
 def _init_ask_state() -> None:
-    defaults = {
+    for key, val in {
         "ask_processing": False,
         "ask_result": None,
         "ask_error": None,
         "pending_question": None,
         "question_field": "",
-    }
-    for key, val in defaults.items():
+    }.items():
         if key not in st.session_state:
             st.session_state[key] = val
 
@@ -105,20 +101,17 @@ def api_upload(file_bytes: bytes, filename: str) -> dict:
         return r.json()
 
 
-def render_answer_primary(data: dict) -> None:
-    """Final answer at top — always visible and visually distinct."""
+def render_answer(data: dict) -> None:
     answer_text = data.get("llm_response") or data.get("answer") or ""
     st.markdown('<div class="answer-label">Answer</div>', unsafe_allow_html=True)
     if data.get("refused_insufficient_evidence"):
         st.warning("Insufficient evidence — safe refusal")
-    safe_answer = html.escape(answer_text).replace("\n", "<br>")
-    st.markdown(
-        f'<div class="answer-highlight">{safe_answer}</div>',
-        unsafe_allow_html=True,
-    )
+    safe = html.escape(answer_text).replace("\n", "<br>")
+    st.markdown(f'<div class="answer-highlight">{safe}</div>', unsafe_allow_html=True)
+
+    retrieval = data.get("retrieval", {})
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Confidence", f"{data.get('confidence_score', 0):.0%}")
-    retrieval = data.get("retrieval", {})
     c2.metric("Chunks used", retrieval.get("chunks_above_threshold", 0))
     c3.metric("Total latency", f"{data.get('latency_seconds', 0)}s")
     if data.get("llm_latency_seconds"):
@@ -127,25 +120,23 @@ def render_answer_primary(data: dict) -> None:
         c4.metric("Language", data.get("query_language", "en"))
 
 
-def render_debug_expanders(data: dict) -> None:
-    """Retrieval, citations, prompts, and logs — collapsed by default."""
+def render_pipeline_details(data: dict) -> None:
     retrieval = data.get("retrieval", {})
     prompts = data.get("prompts", {})
     citations = data.get("citations", [])
 
-    with st.expander("Question & language detection", expanded=False):
+    with st.expander("Question & language", expanded=False):
         st.markdown(f"**Question:** {data.get('question', '')}")
-        st.caption(f"Detected language: **{data.get('query_language', 'en')}**")
+        st.caption(f"Detected: **{data.get('query_language', 'en')}**")
 
-    with st.expander("Retrieval summary & settings", expanded=False):
+    with st.expander("Retrieval", expanded=False):
         c1, c2, c3 = st.columns(3)
-        c1.metric("Chunks retrieved", retrieval.get("chunks_retrieved", 0))
+        c1.metric("Retrieved", retrieval.get("chunks_retrieved", 0))
         c2.metric("Above threshold", retrieval.get("chunks_above_threshold", 0))
         c3.metric("top_k", retrieval.get("top_k", "—"))
-        st.markdown("**English retrieval query (translation boundary):**")
         st.code(retrieval.get("retrieval_query_english", ""), language=None)
         st.caption(
-            f"similarity_threshold={retrieval.get('similarity_threshold')} · "
+            f"threshold={retrieval.get('similarity_threshold')} · "
             f"{retrieval.get('answer_language_instruction', '')}"
         )
 
@@ -159,57 +150,43 @@ def render_debug_expanders(data: dict) -> None:
                 if ch.get("used_in_llm_context")
                 else ("above threshold" if ch.get("above_threshold") else "below threshold")
             )
-            title = (
-                f"Chunk {idx}: {ch.get('source_file')} · p.{ch.get('page_number')} · "
-                f"sim {ch.get('similarity', 0):.3f} · {flag}"
-            )
-            with st.expander(title, expanded=False):
-                st.caption(f"ID: `{ch.get('chunk_id')}`")
+            with st.expander(
+                f"{idx}. {ch.get('source_file')} · p.{ch.get('page_number')} · "
+                f"sim {ch.get('similarity', 0):.3f} · {flag}",
+                expanded=False,
+            ):
+                st.caption(f"`{ch.get('chunk_id')}`")
                 st.text(ch.get("text", ""))
 
     with st.expander(f"Citations ({len(citations)})", expanded=False):
         if not citations:
-            st.info("No citations for this response.")
+            st.info("No citations.")
         for cite in citations:
             st.markdown(
                 f'<div class="citation-box">'
                 f"<strong>{cite.get('label', '')}</strong><br>"
-                f'<em>"{cite.get("snippet", "")}"</em>'
-                f"</div>",
+                f'<em>"{cite.get("snippet", "")}"</em></div>',
                 unsafe_allow_html=True,
             )
 
-    with st.expander("Prompts sent to LLM", expanded=False):
-        st.markdown("**System prompt**")
+    with st.expander("Prompts", expanded=False):
+        st.markdown("**System**")
         st.text(prompts.get("system_prompt", ""))
-        st.markdown("**User prompt (context + question)**")
-        st.text(prompts.get("user_prompt") or "(not sent — insufficient retrieval evidence)")
+        st.markdown("**User (context + question)**")
+        st.text(prompts.get("user_prompt") or "(not sent — insufficient evidence)")
 
-    with st.expander("Full pipeline trace (debug JSON)", expanded=False):
+    with st.expander("Full trace (JSON)", expanded=False):
         st.json(data)
-
-    with st.expander("Interaction log file", expanded=False):
-        st.caption(f"Each ask appends a trace to `{LOG_PATH}`")
-        if LOG_PATH.exists():
-            try:
-                records = json.loads(LOG_PATH.read_text(encoding="utf-8"))
-                st.caption(f"{len(records)} total interactions")
-                if records:
-                    st.json(records[-1])
-            except json.JSONDecodeError:
-                st.warning("Log file empty or invalid.")
 
 
 def process_pending_question() -> None:
-    """Run API call for a queued question; clear input when done."""
     question = st.session_state.pending_question
     if not question:
         return
-
     st.session_state.ask_processing = True
     st.session_state.ask_error = None
     try:
-        with st.spinner("Retrieving context and generating answer…"):
+        with st.spinner("Retrieving and generating…"):
             st.session_state.ask_result = api_post("/ask", {"question": question})
         st.session_state.question_field = ""
     except Exception as exc:
@@ -220,48 +197,46 @@ def process_pending_question() -> None:
         st.session_state.ask_processing = False
 
 
+# --- Sidebar ---
 with st.sidebar:
     st.header("System")
     try:
         health = api_get("/health")
         st.success(f"API: {health['status']}")
-        st.caption(f"Indexed chunks: {health['vector_store_chunks']}")
+        st.caption(f"Chunks indexed: {health['vector_store_chunks']}")
     except Exception as exc:
         st.error(f"API unreachable: {exc}")
-        st.caption("Start backend: `python main.py`")
+        st.caption("Run `python main.py`")
 
     st.divider()
     st.header("Documents")
     uploaded = st.file_uploader("Upload PDF", type=["pdf"])
     if uploaded and st.button("Ingest PDF"):
-        with st.spinner("Indexing..."):
+        with st.spinner("Indexing…"):
             try:
-                result = api_upload(uploaded.read(), uploaded.name)
-                st.success(f"Indexed {result.get('chunks_indexed', 0)} chunks")
+                r = api_upload(uploaded.read(), uploaded.name)
+                st.success(f"Indexed {r.get('chunks_indexed', 0)} chunks")
             except Exception as exc:
                 st.error(str(exc))
 
     if st.button("Re-ingest all in documents/"):
-        with st.spinner("Re-indexing..."):
+        with st.spinner("Re-indexing…"):
             try:
-                results = api_post("/ingest", {})
-                st.success(f"Processed {len(results)} files")
+                st.success(f"Processed {len(api_post('/ingest', {}))} files")
             except Exception as exc:
                 st.error(str(exc))
 
     st.divider()
-    st.header("Interaction log")
     if LOG_PATH.exists():
         try:
-            records = json.loads(LOG_PATH.read_text(encoding="utf-8"))
-            st.caption(f"{len(records)} interactions logged")
+            n = len(json.loads(LOG_PATH.read_text(encoding="utf-8")))
+            st.caption(f"Interaction log: {n} entries")
         except json.JSONDecodeError:
-            st.caption("Log file empty or invalid")
-    else:
-        st.caption("No interactions yet")
+            st.caption("Interaction log: empty")
 
+# --- Main ---
 st.title("Potens Document Q&A")
-st.caption("Full RAG pipeline visibility · English PDFs · multilingual queries")
+st.caption("English PDFs · multilingual queries · full pipeline visibility")
 
 tab_ask, tab_contradict, tab_log = st.tabs(["Ask", "Contradiction", "Interaction log"])
 
@@ -272,20 +247,10 @@ with tab_ask:
         process_pending_question()
         st.rerun()
 
-    if st.session_state.ask_result:
-        render_answer_primary(st.session_state.ask_result)
-        st.divider()
-        st.markdown("##### Pipeline details (expand to inspect)")
-        render_debug_expanders(st.session_state.ask_result)
-        st.divider()
-
-    if st.session_state.ask_error:
-        st.error(st.session_state.ask_error)
-
     with st.form("ask_form", clear_on_submit=False):
         st.text_area(
             "Your question",
-            placeholder="Ask in English or Hindi…",
+            placeholder="English, Hindi, Gujarati, or Marathi…",
             height=90,
             key="question_field",
             disabled=st.session_state.ask_processing,
@@ -307,43 +272,56 @@ with tab_ask:
             st.warning("Enter a question first.")
 
     if st.session_state.ask_processing:
-        st.caption("Processing your question — please wait.")
+        st.caption("Processing…")
+
+    st.divider()
+
+    if st.session_state.ask_error:
+        st.error(st.session_state.ask_error)
+
+    if st.session_state.ask_result:
+        st.subheader("Response")
+        render_answer(st.session_state.ask_result)
+        st.divider()
+        st.subheader("Pipeline details")
+        render_pipeline_details(st.session_state.ask_result)
 
 with tab_contradict:
+    st.caption("See `examples/education_sample_questions.md` for sample pairs (C1–C4).")
     c1, c2, c3 = st.columns(3)
     with c1:
-        doc1 = st.text_input("Document 1", placeholder="leave_policy.pdf")
+        doc1 = st.text_input("Document 1", placeholder="student_data_privacy_policy_2024.pdf")
     with c2:
-        doc2 = st.text_input("Document 2", placeholder="hr_handbook_excerpt.pdf")
+        doc2 = st.text_input("Document 2", placeholder="national_curriculum_framework_2023.pdf")
     with c3:
-        topic = st.text_input("Topic", placeholder="annual leave entitlement")
+        topic = st.text_input("Topic", placeholder="definition of compliance")
 
     if st.button("Analyze contradiction", disabled=not (doc1 and doc2 and topic)):
-        with st.spinner("Analyzing..."):
+        with st.spinner("Analyzing…"):
             try:
                 result = api_post(
                     "/contradict",
-                    {"document_1": doc1.strip(), "document_2": doc2.strip(), "topic": topic.strip()},
+                    {
+                        "document_1": doc1.strip(),
+                        "document_2": doc2.strip(),
+                        "topic": topic.strip(),
+                    },
                 )
             except Exception as exc:
                 st.error(str(exc))
                 st.stop()
-        if result.get("conflict"):
-            st.error("Conflict detected")
-        else:
-            st.success("No explicit conflict")
+        st.error("Conflict detected") if result.get("conflict") else st.success("No explicit conflict")
         st.write(result.get("reasoning", ""))
         for item in result.get("evidence", []):
             if isinstance(item, dict):
                 st.markdown(f"- **{item.get('document', '')}** — {item.get('quote', '')}")
 
 with tab_log:
-    st.caption(f"File: `{LOG_PATH}`")
+    st.caption(f"`{LOG_PATH}`")
     if LOG_PATH.exists():
         try:
-            records = json.loads(LOG_PATH.read_text(encoding="utf-8"))
-            st.json(records)
+            st.json(json.loads(LOG_PATH.read_text(encoding="utf-8")))
         except Exception as exc:
             st.error(str(exc))
     else:
-        st.info("No interactions logged yet. Ask a question in the Ask tab.")
+        st.info("No interactions yet. Ask a question in the Ask tab.")

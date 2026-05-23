@@ -53,7 +53,7 @@ Place PDFs in `documents/`, then:
 
 ```bash
 python main.py                  # API — ingests if chroma_db is empty
-streamlit run streamlit_app/app.py
+streamlit run streamlit_app/ui.py
 ```
 
 ---
