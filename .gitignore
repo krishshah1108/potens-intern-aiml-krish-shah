@@ -12,3 +12,5 @@ dist/
 build/
 .streamlit/secrets.toml
 scripts/
+evaluation/eval_dataset.json
+app/evaluation/eval_dataset.json

@@ -48,16 +48,6 @@ def answer_question(question: str) -> dict[str, Any]:
 
     all_chunks = retrieve(retrieval_query)
     relevant_chunks = filter_by_threshold(all_chunks)
-
-    if not relevant_chunks and all_chunks:
-        best_sim = all_chunks[0]["similarity"]
-        if best_sim >= 0.35:
-            relevant_chunks = all_chunks[: min(5, len(all_chunks))]
-            logger.info(
-                "Using top %d chunks below threshold (best similarity=%.3f)",
-                len(relevant_chunks),
-                best_sim,
-            )
     relevant_ids = {
         c.get("chunk_id") or c.get("metadata", {}).get("chunk_id") for c in relevant_chunks
     }

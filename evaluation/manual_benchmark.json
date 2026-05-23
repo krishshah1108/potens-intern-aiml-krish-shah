@@ -1,0 +1,65 @@
+[
+  {
+    "id": 1,
+    "question": "What is the administrative fine range for unauthorized disclosure of student data?",
+    "expected_source": "student_data_privacy_policy_2024.pdf",
+    "expected_keywords": ["5", "50", "lakh", "fine"]
+  },
+  {
+    "id": 2,
+    "question": "When did the National Curriculum Framework 2023 become effective?",
+    "expected_source": "national_curriculum_framework_2023.pdf",
+    "expected_keywords": ["April", "2023"]
+  },
+  {
+    "id": 3,
+    "question": "Which states participated in RLOS Phase II?",
+    "expected_source": "learning_outcomes_study_rlos_phase2.pdf",
+    "expected_keywords": ["Karnataka", "Maharashtra", "Tamil Nadu"]
+  },
+  {
+    "id": 4,
+    "question": "What minimum weekly synchronous online block did DLI treatment schools receive?",
+    "expected_source": "online_education_effectiveness_dli_2024.pdf",
+    "expected_keywords": ["90", "minutes"]
+  },
+  {
+    "id": 5,
+    "question": "What percentage of planned inquiry hours were delivered in the STEM evaluation?",
+    "expected_source": "stem_curriculum_evaluation_framework2022.pdf",
+    "expected_keywords": ["52"]
+  },
+  {
+    "id": 6,
+    "question": "How many hours of digital pedagogy training are required for TTC certification?",
+    "expected_source": "teacher_training_certification_guidelines_2024.pdf",
+    "expected_keywords": ["40", "hours"]
+  },
+  {
+    "id": 7,
+    "question": "विद्यार्थी डेटा के अनधिकृत प्रकटीकरण के लिए प्रशासनिक जुर्माना कितना है?",
+    "expected_source": "student_data_privacy_policy_2024.pdf",
+    "expected_keywords": ["लाख", "5", "50"]
+  },
+  {
+    "id": 8,
+    "question": "NCF 2023 मध्ये प्राथमिक शिक्षणासाठी किती भाषा समाविष्ट आहेत?",
+    "expected_source": "national_curriculum_framework_2023.pdf",
+    "expected_keywords": ["language", "भाषा"]
+  },
+  {
+    "id": 9,
+    "question": "What is Finland's PISA 2022 rank in the UNESCO 2030 teacher pay index?",
+    "expected_source": null,
+    "expected_keywords": ["do not contain enough information", "insufficient"]
+  },
+  {
+    "id": 10,
+    "contradiction": {
+      "document_1": "student_data_privacy_policy_2024.pdf",
+      "document_2": "national_curriculum_framework_2023.pdf",
+      "topic": "definition of compliance"
+    },
+    "note": "Use POST /contradict; expect reasoning citing both documents"
+  }
+]

@@ -1,39 +1,49 @@
 # AI Use Log
 
-Transparency log for tools used while building this internship take-home project.
+Transparency for Potens internship take-home reviewers.
 
-## Tools Used
+## Tools used
 
-| Tool | Approx. prompts / sessions | Purpose |
-|------|---------------------------|---------|
-| **Cursor AI** | ~25–30 agent interactions | Project scaffolding, architecture design, code implementation, test writing, README drafting, debugging |
-| **Gemini 2.5 Flash** | Runtime (API calls) | Grounded answer generation, contradiction analysis JSON output |
-| **ChatGPT** | ~3–5 (optional review) | Reviewing README clarity, sanity-checking evaluation metrics wording |
+| Tool | Approx. usage | What it was used for |
+|------|----------------|----------------------|
+| **Cursor (Agent)** | ~35–45 multi-step sessions over ~2 days | Scaffolding, implementation, refactors, README, debugging Chroma/Gemini/Streamlit on Windows |
+| **Gemini 2.5 Flash** | Runtime API (not training) | Grounded answers and contradiction JSON via `google-genai` |
+| **ChatGPT** | ~2–3 optional reviews | Wording checks on README sections (not code generation) |
 
-## What AI Helped With
+Rough Cursor scale: on the order of **hundreds of tool calls** (file edits, terminal, search) — not token-precise; treat as **heavy AI-assisted implementation**.
 
-- Initial folder structure and module boundaries
-- Boilerplate for FastAPI routes, Pydantic schemas, and Streamlit layout
-- Prompt templates for grounded answering and contradiction analysis
-- Test case skeletons and manual test results script structure
-- README architecture diagram (Mermaid) and tradeoffs section drafting
+## What AI generated or heavily shaped
 
-## What Was Done Manually / With Engineering Judgment
+- Initial repo layout and module boundaries  
+- FastAPI route boilerplate, Pydantic models, Streamlit layout  
+- First-pass prompt templates (grounded + contradiction)  
+- Early sample HR PDF generator and eval script (later **removed** when scope was tightened)  
+- README structure and architecture diagram drafts  
 
-- Technology stack selection and explicit exclusions (no reranking, no hybrid BM25, no agents)
-- Chunk size (800) and overlap (150) tuning rationale
-- Similarity threshold (0.45) and confidence heuristic design
-- Multilingual translation-boundary approach (simplicity over complexity)
-- Hallucination refusal strategy (threshold + strict prompts)
-- Intentional contradiction pair: `leave_policy.pdf` vs `hr_handbook_excerpt.pdf` (20 vs 18 leave days)
-- Interaction log schema for evaluation/eval_dataset.json (project root)
+## What I decided manually (engineering judgment)
 
-## Honest Notes
+- **Scope cuts:** no reranking, hybrid BM25, OCR, LangGraph, Docker, auth  
+- **Chunking:** 800 / 150 with metadata prefix in chunk text  
+- **Threshold:** 0.45 cosine similarity; **no** “borderline” fallback that sends weak chunks to the LLM (removed after review — it weakened refusal honesty)  
+- **Multilingual:** translation boundary (query → EN for retrieval → answer in query language)  
+- **Corpus:** switched from synthetic HR PDFs to **real education policy/research PDFs** I sourced for harder RAG testing  
+- **Eval honesty:** dropped automated “accuracy” script that hit Gemini rate limits; kept `manual_benchmark.json` + interaction log instead of fake metrics  
+- **UI:** merged Streamlit into `ui.py` to avoid shadowing the `app` package  
 
-- AI-assisted code was reviewed, simplified, and trimmed to avoid over-engineering.
-- All prompts enforce context-only answers; this was a deliberate design choice, not auto-generated fluff.
-- Limitations and future improvements were written to reflect real constraints, not marketing copy.
+## What I verified myself
 
-## Candidate Statement
+- End-to-end Ask + Contradiction flows in Streamlit  
+- Hindi/Marathi sample questions in `examples/education_sample_questions.md`  
+- Refusal on out-of-corpus question (Q18)  
+- Retrieval debug: scores, threshold flags, citations match chunks  
 
-I used AI as an accelerator for implementation and documentation, while retaining responsibility for architecture, reliability tradeoffs, and evaluation design. The final system reflects intentional engineering decisions suitable for a 24-hour focused assignment.
+## Known limitations (model + stack)
+
+- Gemini may still paraphrase; prompts require context-only answers but are not a formal guarantee  
+- `langdetect` / Google Translate can misclassify or mistranslate short queries  
+- Contradiction endpoint depends on topic-specific retrieval finding both sides  
+- Confidence score is a **heuristic**, not calibrated probability  
+
+## Candidate statement
+
+I used AI as an **implementation accelerator**, not as a substitute for judgment. The submission prioritizes grounded retrieval, visible debugging, and honest scope over impressive-sounding extras. If something is not in the README or code, I did not claim it works.

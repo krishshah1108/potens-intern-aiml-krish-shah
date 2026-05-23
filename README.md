@@ -1,125 +1,184 @@
 # potens-intern-aiml-techiekrish
 
-**Document Q&A with Citations** — Focused, production-aware RAG for Potens IT Services.
+**Document Q&A with Citations** — a focused RAG take-home for Potens IT Services (Problem Q1).
 
-Built for **reliability**, **grounded answers**, and **full pipeline transparency**.
-
----
-
-## Project Overview
-
-- Multilingual **queries** (English, Hindi, Gujarati, Marathi) over an **English PDF** corpus
-- Grounded answers with **citations** (source, page, chunk ID, snippet)
-- **Refusal** when retrieval evidence is weak
-- **Streamlit UI** shows the complete RAG flow per question
-- Each `/ask` interaction is appended to `evaluation/eval_dataset.json` (project root) for debugging
+Design goal: a **trustworthy, grounded pipeline** with retrieval transparency — not feature breadth.
 
 ---
 
-## Folder Structure
+## What works today
+
+| Area | Status |
+|------|--------|
+| PDF ingest → chunk → embed → ChromaDB | Working |
+| `POST /ask` with citations + confidence | Working |
+| `POST /contradict` with reasoning + evidence | Working |
+| Multilingual queries (en/hi/gu/mr) → answer in same language | Working (translation boundary) |
+| Similarity threshold + strict prompts + refusal | Working |
+| Streamlit UI + full retrieval debug | Working |
+| Runtime interaction log | Working (`evaluation/eval_dataset.json`) |
+
+## What is incomplete or fragile
+
+| Item | Notes |
+|------|--------|
+| **Automated labeled eval** | No `run_eval.py` with hit-rate metrics — manual benchmark + interaction log instead (time vs. quota tradeoff). |
+| **Gujarati / Marathi** | Supported in code; less manually tested than English/Hindi. |
+| **Contradiction on implicit conflicts** | LLM may miss subtle semantic clashes; works best on explicit numeric/policy conflicts. |
+| **Windows + ChromaDB** | Some environments hit ONNX/access issues; WSL or Linux venv recommended. |
+| **Corpus language** | PDFs are English-only; multilingual is query-time only. |
+| **Gemini free tier** | Rate limits on heavy UI testing. |
+
+---
+
+## Quick start (< 10 minutes)
+
+```bash
+git clone <your-repo-url>
+cd potens-intern-aiml-techiekrish
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate   # Linux/macOS
+pip install -r requirements.txt
+copy .env.example .env          # set GEMINI_API_KEY
+```
+
+Terminal 1 — API:
+
+```bash
+python main.py
+```
+
+Terminal 2 — UI:
+
+```bash
+streamlit run streamlit_app/ui.py
+```
+
+On first run, ingest PDFs from `documents/` via Streamlit **Re-ingest all** or `POST /ingest`.
+
+**Verify:** `GET http://localhost:8000/health` → `vector_store_chunks` > 0.
+
+---
+
+## Corpus (included)
+
+Six English education policy/research PDFs (~10–15 pages each) in `documents/`:
+
+| File | Role |
+|------|------|
+| `student_data_privacy_policy_2024.pdf` | SDP / penalties |
+| `national_curriculum_framework_2023.pdf` | NCF structure |
+| `learning_outcomes_study_rlos_phase2.pdf` | RLOS Phase II study |
+| `online_education_effectiveness_dli_2024.pdf` | DLI evaluation |
+| `stem_curriculum_evaluation_framework2022.pdf` | STEM fidelity |
+| `teacher_training_certification_guidelines_2024.pdf` | TTC certification |
+
+**Manual test plan:** `examples/education_sample_questions.md` (20 questions + 4 contradiction pairs).  
+**Benchmark checklist:** `evaluation/manual_benchmark.json` (10 items for quick judge-style checks).
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  PDF[PDF documents] --> Load[pypdf page extract]
+  Load --> Chunk[RecursiveCharacterTextSplitter 800/150]
+  Chunk --> Embed[MiniLM embeddings]
+  Embed --> Chroma[(ChromaDB)]
+  Q[User question] --> Lang[langdetect + translate to EN]
+  Lang --> Retrieve[semantic top-k + threshold]
+  Chroma --> Retrieve
+  Retrieve --> Prompt[grounded Gemini prompt]
+  Prompt --> Answer[answer + citations]
+  Answer --> Log[interaction log JSON]
+```
+
+**Modules**
+
+- `app/ingestion/` — PDF load, chunking, ingest pipeline  
+- `app/rag/` — embeddings, ChromaDB, retrieval, scoring  
+- `app/services/` — QA orchestration, LLM, language, contradiction  
+- `app/prompts/` — grounded + contradiction templates  
+- `app/api/` — FastAPI routes  
+- `streamlit_app/ui.py` — UI (calls API; avoids naming clash with `app/` package)
+
+---
+
+## Folder structure
 
 ```
-project-root/
 ├── app/
 │   ├── api/              # FastAPI routes
 │   ├── rag/              # Embeddings, ChromaDB, retrieval
 │   ├── ingestion/        # PDF load, chunking, pipeline
-│   ├── evaluation/       # Q&A pipeline modules (logging only)
-│   ├── prompts/          # LLM prompt templates
-│   ├── utils/            # Config, logging, citations
-│   └── services/         # QA, LLM, language, contradiction
-├── documents/            # Place PDFs here, then ingest
-├── evaluation/           # Interaction log: eval_dataset.json (each /ask)
-├── chroma_db/            # Vector store (generated locally)
-├── streamlit_app/        # UI with full pipeline visibility
+│   ├── evaluation/       # interaction_log.py
+│   ├── prompts/
+│   ├── utils/
+│   └── services/
+├── documents/            # PDF corpus
+├── evaluation/
+│   ├── eval_dataset.json       # runtime Q&A traces (gitignored)
+│   └── manual_benchmark.json   # 10 manual test cases
+├── examples/
+├── streamlit_app/ui.py
+├── tests/test_core.py
 ├── main.py
-├── requirements.txt
-├── .env.example
 └── README.md
 ```
 
 ---
 
-## Setup
+## Chunking strategy (800 / 150)
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-pip install -r requirements.txt
-copy .env.example .env          # set GEMINI_API_KEY
-```
+`RecursiveCharacterTextSplitter` with `chunk_size=800`, `chunk_overlap=150`:
 
-Place PDFs in `documents/`, then:
+- **Semantic continuity** — splits on paragraphs/sentences before hard cuts.  
+- **Retrieval quality** — chunks large enough to hold a policy clause or table row context.  
+- **Citation precision** — overlap reduces answers that span a boundary without retrieval support.  
+- **Metadata** — every chunk stores `source_file`, `page_number`, `chunk_id`, `document_id`, `language` (corpus tagged `en`).
 
-```bash
-python main.py                  # API — ingests if chroma_db is empty
-streamlit run streamlit_app/ui.py
-```
+Chunk text is prefixed with `Source: {file} | page {n}` so embeddings and citations stay aligned.
 
 ---
 
-## Fresh testing (clean slate)
+## Retrieval strategy
 
-```powershell
-Remove-Item documents\*.pdf -Force -ErrorAction SilentlyContinue
-Remove-Item chroma_db\* -Recurse -Force -ErrorAction SilentlyContinue
-# Reset interaction log:
-# evaluation/eval_dataset.json should contain: []
-```
+1. Detect query language → translate to English for retrieval (documents are English).  
+2. Embed query with `paraphrase-multilingual-MiniLM-L12-v2`.  
+3. Fetch `retrieval_candidates` (25) from ChromaDB, keep top `top_k` (8).  
+4. Filter by `similarity_threshold` (0.45, cosine similarity `1 - distance`).  
+5. If **no chunks pass threshold** → return fixed insufficient-information message (**no LLM call**).
 
-Upload PDFs via Streamlit sidebar or copy files into `documents/` and click **Re-ingest all**.
-
-### Education Policy & Research corpus (RAG stress-test)
-
-Generate six long-form PDFs (research + policy) with overlapping entities, cross-references, tables, clauses, and annexures:
-
-```bash
-python scripts/generate_education_dataset.py
-```
-
-| File | Type | Pages (approx.) |
-|------|------|-----------------|
-| `edu_research_learning_outcomes_study.pdf` | Research | 15 |
-| `edu_research_online_education_effectiveness.pdf` | Research | 15 |
-| `edu_research_stem_curriculum_evaluation.pdf` | Research | 15 |
-| `edu_policy_national_curriculum_framework.pdf` | Policy | 14 |
-| `edu_policy_student_data_privacy.pdf` | Policy | 14 |
-| `edu_policy_teacher_training_certification.pdf` | Policy | 14 |
-
-Sample evaluation questions: `examples/education_sample_questions.md`. Re-ingest after generation.
+Confidence heuristic: `0.7 * max(similarity) + 0.3 * (fraction above threshold)`.
 
 ---
 
-## Streamlit — full pipeline per question
+## Hallucination prevention
 
-1. **Your question** (with detected language)
-2. **Retrieval** — English query, all chunks, scores, threshold flags
-3. **Prompts** — system + user prompt (with context block)
-4. **LLM response**
-5. **Citations**
-6. Confirmation that the trace was saved to `eval_dataset.json`
+- Threshold gate before LLM  
+- System prompt: context-only, exact refusal string when unsupported  
+- Citations built only from chunks sent to the model  
+- Streamlit shows all retrieved chunks, scores, and threshold flags  
 
-Use the **Interaction log** tab to inspect all past runs as JSON.
+Refusal text:
+
+> The provided documents do not contain enough information to answer this question confidently.
 
 ---
 
-## Interaction log (`eval_dataset.json`)
+## Multilingual support
 
-Path: `evaluation/eval_dataset.json` (at project root, not inside `app/`)
+Supported query languages: **English, Hindi, Gujarati, Marathi**.
 
-Each `POST /ask` appends one record:
+Flow (intentionally simple):
 
-| Field | Content |
-|-------|---------|
-| `question` | Original user query |
-| `retrieval` | All chunks, scores, threshold filter, English retrieval query |
-| `prompts` | System and user prompts |
-| `llm_response` | Final answer |
-| `citations` | References with snippets |
-| `refused_insufficient_evidence` | Safe refusal flag |
-| `latency_seconds` | End-to-end timing |
+1. `langdetect` on the question  
+2. Translate query to English (`deep-translator`) for retrieval  
+3. Instruct Gemini to answer in the original language  
 
-This is an **explainability log**, not a labeled accuracy benchmark.
+Tradeoff: translation quality affects retrieval; we accepted this for speed and reliability vs. multilingual PDF ingestion.
 
 ---
 
@@ -127,45 +186,92 @@ This is an **explainability log**, not a labeled accuracy benchmark.
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /health` | Status and chunk count |
-| `POST /ask` | Full trace + logging |
+| `GET /health` | Status + chunk count |
+| `POST /ask` | Answer, citations, confidence, retrieval trace; appends to interaction log |
 | `POST /contradict` | Compare two documents on a topic |
 | `POST /ingest` | Re-index all PDFs in `documents/` |
 | `POST /ingest/upload` | Upload one PDF |
 
----
-
-## Technology Choices
-
-| Component | Choice |
-|-----------|--------|
-| Vector DB | ChromaDB |
-| LLM | Gemini 2.5 Flash (`google-genai`) |
-| Embeddings | paraphrase-multilingual-MiniLM-L12-v2 |
-| Chunking | RecursiveCharacterTextSplitter (800 / 150 overlap) |
-| Backend | FastAPI |
-| UI | Streamlit |
+**Ask response (high level):** `answer`, `citations[]` (source, page, chunk_id, snippet), `confidence_score`, `retrieved_chunks`, `query_language`, `refused_insufficient_evidence`, plus `retrieval` / `prompts` for debugging.
 
 ---
 
-## Hallucination prevention
+## Evaluation approach
 
-- Similarity threshold on retrieved chunks
-- Strict context-only prompts
-- Fixed insufficient-information refusal message
-- Heuristic confidence score
+| Artifact | Purpose |
+|----------|---------|
+| `evaluation/manual_benchmark.json` | 10 labeled questions + 1 contradiction case for manual verification |
+| `examples/education_sample_questions.md` | Full 20-question regression script |
+| `evaluation/eval_dataset.json` | **Runtime** log of each `/ask` (retrieval, prompts, answer) — explainability, not ground-truth accuracy |
 
----
-
-## Limitations
-
-- English PDFs only (queries may be multilingual)
-- No OCR, reranking, or hybrid BM25
-- Gemini free tier rate limits apply
-- `eval_dataset.json` grows with each question — clear it when restarting tests
+We did **not** ship a fake automated accuracy script. Labeled hit-rate eval was dropped after Gemini free-tier limits during batch runs; honesty over inflated metrics.
 
 ---
 
-## AI Use Log
+## Technology choices (why)
+
+| Choice | Why |
+|--------|-----|
+| **ChromaDB** | Persistent local vectors, minimal ops overhead for a 24h scope |
+| **Gemini 2.5 Flash** | Fast, multilingual generation, accessible free tier |
+| **MiniLM multilingual embeddings** | Cross-lingual retrieval without re-embedding English PDFs per language |
+| **FastAPI + Streamlit** | Thin API boundary + quick debug UI |
+| **RecursiveCharacterTextSplitter** | Standard, predictable chunking with overlap |
+
+**Explicitly not built:** reranking, hybrid BM25, OCR, agents, Docker, auth, cloud deploy.
+
+---
+
+## Tradeoffs
+
+| Decision | Benefit | Cost |
+|----------|---------|------|
+| Translation boundary | Works with English PDFs | Retrieval depends on translator |
+| Single similarity threshold | Simple, auditable | May refuse borderline valid questions |
+| Full trace in API + log | Judge-friendly transparency | Larger JSON payloads |
+| Local ChromaDB | No external DB setup | Not multi-user production ready |
+
+---
+
+## Future improvements (not implemented)
+
+- Cross-encoder reranking  
+- Hybrid BM25 + vector  
+- OCR for scanned PDFs  
+- pgvector / managed vector DB  
+- Streaming answers  
+- Proper labeled eval harness with retrieval-only mode  
+
+---
+
+## Tests
+
+```bash
+pytest tests/ -q
+```
+
+Covers chunk metadata, citation formatting, insufficient-answer constant, and language passthrough — **no ChromaDB/Gemini** (avoids Windows ONNX crashes in CI).
+
+---
+
+## Fresh testing
+
+```powershell
+Remove-Item chroma_db\* -Recurse -Force -ErrorAction SilentlyContinue
+# Reset interaction log:
+Set-Content evaluation\eval_dataset.json "[]"
+```
+
+Re-ingest via Streamlit or `POST /ingest`.
+
+---
+
+## AI use log
 
 See [AI_USE_LOG.md](AI_USE_LOG.md).
+
+---
+
+## License / submission
+
+Internship take-home for Potens IT Services. Repository name: `potens-intern-aiml-techiekrish`.

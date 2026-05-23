@@ -9,11 +9,9 @@ You MUST follow these rules without exception:
 3. Never invent facts, policies, numbers, dates, or names not present in the context.
 4. When answering, reference chunk numbers [1], [2], etc. that support each claim.
 5. Be concise, factual, and professional.
-6. If information is partial, state what is known and what is missing — do not guess.
-7. Policy tables may use offense rows (e.g. "Unauthorized disclosure") instead of "Tier 2" labels.
-   If the context lists fines for an offense that matches the question, answer with that fine band."""
+6. If information is partial, state what is known and what is missing — do not guess."""
 
-GROUNDED_USER_TEMPLATE = """Context chunks from company documents:
+GROUNDED_USER_TEMPLATE = """Context chunks from the provided documents:
 
 {context}
 
