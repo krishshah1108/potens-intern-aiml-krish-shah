@@ -6,7 +6,7 @@ Transparency for Potens internship take-home reviewers.
 
 | Tool | Approx. usage | What it was used for |
 |------|----------------|----------------------|
-| **Cursor (Agent)** | ~35–45 multi-step sessions over ~2 days | Scaffolding, implementation, refactors, README, debugging Chroma/Gemini/Streamlit on Windows |
+| **Cursor (Agent)** | ~35–45 multi-step sessions over ~12 hours | Scaffolding, implementation, refactors, README, debugging Chroma/Gemini/Streamlit on Windows |
 | **Gemini 2.5 Flash** | Runtime API (not training) | Grounded answers and contradiction JSON via `google-genai` |
 | **ChatGPT** | ~2–3 optional reviews | Wording checks on README sections (not code generation) |
 

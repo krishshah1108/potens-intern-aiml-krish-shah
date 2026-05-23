@@ -1,4 +1,4 @@
-# potens-intern-aiml-techiekrish
+# potens-intern-aiml-krish-shah
 
 **Document Q&A with Citations** — a focused RAG take-home for Potens IT Services (Problem Q1).
 
@@ -34,8 +34,8 @@ Design goal: a **trustworthy, grounded pipeline** with retrieval transparency �
 ## Quick start (< 10 minutes)
 
 ```bash
-git clone <your-repo-url>
-cd potens-intern-aiml-techiekrish
+git clone https://github.com/krishshah1108/potens-intern-aiml-krish-shah.git
+cd potens-intern-aiml-krish-shah
 python -m venv .venv
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate   # Linux/macOS
@@ -123,7 +123,6 @@ flowchart LR
 │   └── manual_benchmark.json   # 10 manual test cases
 ├── examples/
 ├── streamlit_app/ui.py
-├── tests/test_core.py
 ├── main.py
 └── README.md
 ```
@@ -244,16 +243,6 @@ We did **not** ship a fake automated accuracy script. Labeled hit-rate eval was 
 
 ---
 
-## Tests
-
-```bash
-pytest tests/ -q
-```
-
-Covers chunk metadata, citation formatting, insufficient-answer constant, and language passthrough — **no ChromaDB/Gemini** (avoids Windows ONNX crashes in CI).
-
----
-
 ## Fresh testing
 
 ```powershell
@@ -274,4 +263,4 @@ See [AI_USE_LOG.md](AI_USE_LOG.md).
 
 ## License / submission
 
-Internship take-home for Potens IT Services. Repository name: `potens-intern-aiml-techiekrish`.
+Internship take-home for Potens IT Services. Repository: [krishshah1108/potens-intern-aiml-krish-shah](https://github.com/krishshah1108/potens-intern-aiml-krish-shah).
