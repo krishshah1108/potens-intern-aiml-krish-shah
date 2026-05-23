@@ -5,10 +5,12 @@ from langdetect import LangDetectException, detect
 
 from app.utils.logging_config import logger
 
-SUPPORTED = {"en", "hi"}
+SUPPORTED = {"en", "hi", "gu", "mr"}
 LANG_NAMES = {
     "en": "English",
     "hi": "Hindi",
+    "gu": "Gujarati",
+    "mr": "Marathi",
 }
 
 
@@ -17,9 +19,8 @@ def detect_query_language(text: str) -> str:
         code = detect(text)
         if code in SUPPORTED:
             return code
-        # Map Indic scripts we do not support yet to Hindi for translation boundary
-        if code in ("gu", "mr", "bn", "pa", "ta", "te"):
-            return "hi"
+        if code.startswith("gu"):
+            return "gu"
     except LangDetectException:
         logger.warning("Language detection failed; defaulting to English")
     return "en"

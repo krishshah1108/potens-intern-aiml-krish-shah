@@ -2,7 +2,6 @@
 
 import time
 
-from app.utils.config import settings
 from app.prompts.grounded_answer import (
     GROUNDED_SYSTEM,
     GROUNDED_USER_TEMPLATE,
@@ -30,18 +29,6 @@ def answer_question(question: str) -> dict:
 
     all_chunks = retrieve(retrieval_query)
     relevant_chunks = filter_by_threshold(all_chunks)
-
-    # Borderline matches (e.g. internship PDF rule phrasing) still get grounded context.
-    if not relevant_chunks and all_chunks:
-        best_sim = all_chunks[0]["similarity"]
-        if best_sim >= 0.35:
-            relevant_chunks = all_chunks[:3]
-            logger.info(
-                "Using top %d chunks below threshold (best similarity=%.3f)",
-                len(relevant_chunks),
-                best_sim,
-            )
-
     confidence = compute_confidence(relevant_chunks if relevant_chunks else all_chunks)
 
     citations = format_citations(relevant_chunks if relevant_chunks else [])
@@ -69,7 +56,7 @@ def answer_question(question: str) -> dict:
     answer, llm_latency = generate_text(GROUNDED_SYSTEM, user_prompt)
 
     if INSUFFICIENT_ANSWER.lower() in answer.lower() and len(answer) < 200:
-        citations = format_citations(relevant_chunks[:2])  # still show nearest evidence
+        citations = format_citations(relevant_chunks[:2])
 
     total_latency = time.perf_counter() - start
     logger.info(
@@ -98,7 +85,6 @@ def _serialize_chunks(chunks: list[dict]) -> list[dict]:
             "source_file": c.get("metadata", {}).get("source_file"),
             "page_number": c.get("metadata", {}).get("page_number"),
             "similarity": c.get("similarity"),
-            "embedding_similarity": c.get("embedding_similarity"),
             "text_preview": (c.get("text") or "")[:200],
         }
         for c in chunks

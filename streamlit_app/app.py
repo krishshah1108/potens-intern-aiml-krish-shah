@@ -99,7 +99,7 @@ with st.sidebar:
 # Main
 st.title("Potens Document Q&A")
 st.caption(
-    "Grounded answers with citations · English · Hindi"
+    "Grounded answers with citations · English · Hindi · Gujarati · Marathi"
 )
 
 tab_ask, tab_contradict = st.tabs(["Ask a question", "Contradiction analysis"])
@@ -107,7 +107,7 @@ tab_ask, tab_contradict = st.tabs(["Ask a question", "Contradiction analysis"])
 with tab_ask:
     question = st.text_area(
         "Your question",
-        placeholder="Ask in English or Hindi...",
+        placeholder="Ask in English, Hindi, Gujarati, or Marathi...",
         height=100,
     )
     if st.button("Get answer", type="primary", disabled=not question.strip()):
@@ -146,13 +146,10 @@ with tab_ask:
             if not chunks:
                 st.write("No chunks retrieved.")
             for ch in chunks:
-                emb = ch.get("embedding_similarity")
-                sim_line = f"Similarity: **{ch.get('similarity', 0):.3f}**"
-                if emb is not None:
-                    sim_line += f" (embedding: {emb:.3f})"
                 st.markdown(
                     f"**{ch.get('source_file')}** · Page {ch.get('page_number')} · "
-                    f"Chunk `{ch.get('chunk_id')}` · {sim_line}"
+                    f"Chunk `{ch.get('chunk_id')}` · "
+                    f"Similarity: **{ch.get('similarity', 0):.3f}**"
                 )
                 st.text(ch.get("text_preview", ""))
                 st.divider()

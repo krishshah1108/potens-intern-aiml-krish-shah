@@ -12,3 +12,6 @@ venv/
 dist/
 build/
 .streamlit/secrets.toml
+.venv-test/
+pip_install_log.txt
+app/evaluation/eval_results.json

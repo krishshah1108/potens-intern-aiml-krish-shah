@@ -24,4 +24,5 @@ def test_answer_language_instruction():
 
 
 def test_supported_languages_set():
-    assert SUPPORTED == {"en", "hi"}
+    assert "gu" in SUPPORTED
+    assert "mr" in SUPPORTED
