@@ -232,14 +232,45 @@ We did **not** ship a fake automated accuracy script. Labeled hit-rate eval was 
 
 ---
 
-## Future improvements (not implemented)
+## Current limitations and why
 
-- Cross-encoder reranking  
-- Hybrid BM25 + vector  
-- OCR for scanned PDFs  
-- pgvector / managed vector DB  
-- Streaming answers  
-- Proper labeled eval harness with retrieval-only mode  
+| Limitation | Impact | Why it exists |
+|------------|--------|----------------|
+| **pypdf text extraction only** | Scanned or badly encoded PDFs lose structure; line breaks can hurt embeddings. | 24h scope; no OCR pipeline integrated. |
+| **Fixed chunking (800 / 150)** | Tables, annexures, and cross-page clauses may split awkwardly; retrieval can miss the “right” half of a rule. | `RecursiveCharacterTextSplitter` is predictable and fast; no layout-aware or semantic chunking yet. |
+| **Pure vector retrieval** | Keyword-heavy queries (e.g. exact policy IDs, acronyms) can rank below semantically similar but wrong chunks. | No BM25 hybrid or cross-encoder reranker — kept simple and debuggable. |
+| **Single similarity threshold (0.45)** | Borderline questions may be refused even when a weak match exists. | Chosen for **hallucination control** over recall; weak chunks are not sent to the LLM. |
+| **Translation boundary for multilingual** | Hindi/Gujarati/Marathi queries depend on translator quality for retrieval; corpus PDFs are English-only. | Faster than multilingual ingest; gu/mr less manually tested than en/hi. |
+| **Local ChromaDB** | Not suited for multi-user production; index lost on ephemeral hosts unless re-ingest. | Minimal ops for take-home; no managed vector DB. |
+| **No automated labeled eval** | No published precision@k or answer F1; manual benchmark + runtime log only. | Gemini free-tier limits on batch eval; honest scope over synthetic metrics. |
+| **Contradiction via LLM only** | Misses subtle or implicit conflicts; best on explicit numeric/policy clashes. | No structured diff or rule engine; single-pass prompt. |
+
+---
+
+## Future scope
+
+**Ingestion & OCR**
+
+- Add OCR (e.g. Tesseract, PaddleOCR, or cloud vision) for scanned annexures and improve layout-aware extraction.
+- Extend PDF text normalization (headers, footers, hyphenation, tables) beyond the current word-per-line fixes in `pdf_loader.py`.
+
+**Chunking**
+
+- Structure-aware chunking by heading, article, or table row instead of fixed character windows only.
+- Variable chunk sizes (smaller for definitions, larger for narrative) with section-title metadata.
+- Tune chunk size/overlap against `manual_benchmark.json` retrieval hit-rate.
+
+**Retrieval**
+
+- Hybrid **BM25 + dense** search and **cross-encoder reranking** (top 25 → top 8).
+- Query expansion or HyDE for acronym-heavy policy questions.
+- Optional **Gemini embeddings API** to cut server RAM on free-tier hosting.
+
+**Production & evaluation**
+
+- Hosted demo (Docker / Render) with startup ingest; protect `/ingest` with auth.
+- Labeled eval harness with **retrieval-only** mode (measure recall before generation).
+- Streaming answers; managed vector DB (pgvector, Pinecone, or Chroma Cloud).
 
 ---
 
