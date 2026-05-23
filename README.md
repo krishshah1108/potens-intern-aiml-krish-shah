@@ -31,7 +31,7 @@ This repository implements a trustworthy retrieval-augmented generation (RAG) pi
 | Safety | Similarity threshold + insufficient-information refusal |
 | API | FastAPI (`/ask`, `/contradict`, `/health`, ingest) |
 | UI | Streamlit with retrieval debug panel |
-| Evaluation | 10-question dataset + metrics script |
+| Evaluation | 20-question dataset + metrics (hit@k, MRR, threshold, refusals) |
 
 **Intentionally not implemented:** reranking, hybrid BM25 + vector search, OCR, agents, Redis, Docker, auth, cloud deployment.
 
@@ -271,19 +271,30 @@ This **translation-boundary** design was chosen for reliability and speed within
 
 ## Evaluation Strategy
 
-Dataset: `app/evaluation/eval_dataset.json` (10 questions with expected sources and keywords)
+Dataset: `app/evaluation/eval_dataset.json` — **20 Q&A pairs** with ground truth (`expected_source`, `expected_keywords`, `expect_refusal`). Questions mix **English, Hindi, and Marathi** against an **English PDF corpus**.
 
 ```bash
-python -m app.evaluation.run_eval
+python scripts/generate_sample_documents.py   # 10 policies, ~10-15 pages each
+python main.py                                 # ingest on first run
+python -m app.evaluation.run_eval              # retrieval metrics only (no LLM quota)
+python -m app.evaluation.run_eval --full       # + grounded answers (~13s between calls)
 ```
 
 **Metrics:**
 
-- Retrieval hit rate (@top-5, expected source present)
-- Keyword match rate in grounded answers
-- Count of appropriate refusals
+| Metric | Description |
+|--------|-------------|
+| Hit@1 / @3 / @5 | Expected source in top-k retrieved chunks |
+| MRR | Mean reciprocal rank of expected source |
+| Threshold pass | Expected source survives similarity filter |
+| Keyword match | Grounded answer contains expected terms |
+| Refusal accuracy | Out-of-corpus questions correctly refused |
+
+Manual test prompts: `examples/sample_questions.md`
 
 Results: `app/evaluation/eval_results.json` (gitignored).
+
+**Contradiction pairs in corpus:** leave (20 vs 18 days), remote work (3 vs 2 days), password rotation (90 vs 60 days), client retention (7 vs 5 years).
 
 ---
 

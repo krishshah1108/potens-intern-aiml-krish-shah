@@ -15,3 +15,8 @@ build/
 .venv-test/
 pip_install_log.txt
 app/evaluation/eval_results.json
+documents/Potens_Intern_Take_Home_2026.pdf
+documents/multilingual_notice.pdf
+.venv-test/
+__pycache__/
+.pytest_cache/

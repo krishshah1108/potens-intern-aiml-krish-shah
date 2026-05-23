@@ -160,7 +160,7 @@ with tab_contradict:
     with c1:
         doc1 = st.text_input("Document 1 filename", placeholder="leave_policy.pdf")
     with c2:
-        doc2 = st.text_input("Document 2 filename", placeholder="hr_handbook.pdf")
+        doc2 = st.text_input("Document 2 filename", placeholder="hr_handbook_excerpt.pdf")
     with c3:
         topic = st.text_input("Topic", placeholder="annual leave entitlement")
 
