@@ -1,7 +1,6 @@
 """Document chunking with required metadata preservation."""
 
 import hashlib
-import re
 from typing import Any
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -9,21 +8,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.utils.config import settings
 from app.utils.logging_config import logger
 
-SUPPORTED_LANGUAGES = {"en", "hi", "gu", "mr"}
-
-
-def detect_language(text: str) -> str:
-    """Heuristic language detection for chunk metadata."""
-    sample = text[:500]
-    if re.search(r"[\u0A80-\u0AFF]", sample):
-        return "gu"
-    if re.search(r"[\u0900-\u097F]", sample) and re.search(
-        r"(मराठी|महाराष्ट्र)", sample
-    ):
-        return "mr"
-    if re.search(r"[\u0900-\u097F]", sample):
-        return "hi"
-    return "en"
+# Corpus PDFs are English-only. Multilingual handling is at query time (language.py).
+DOCUMENT_LANGUAGE = "en"
 
 
 def make_document_id(source_file: str) -> str:
@@ -60,7 +46,6 @@ def chunk_pages(
             continue
 
         splits = splitter.split_text(page_text)
-        language = detect_language(page_text)
 
         for split in splits:
             chunk_counter += 1
@@ -72,7 +57,7 @@ def chunk_pages(
                         "page_number": page["page_number"],
                         "chunk_id": f"{document_id}_{chunk_counter}",
                         "document_id": document_id,
-                        "language": language,
+                        "language": DOCUMENT_LANGUAGE,
                     },
                 }
             )

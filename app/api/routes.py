@@ -1,7 +1,5 @@
 """FastAPI route definitions."""
 
-from pathlib import Path
-
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.api.schemas import (
@@ -12,6 +10,7 @@ from app.api.schemas import (
     HealthResponse,
     IngestResponse,
 )
+from app.evaluation.interaction_log import append_interaction
 from app.ingestion.pipeline import ingest_directory, ingest_pdf
 from app.rag.vector_store import get_vector_store
 from app.services.contradiction_service import analyze_contradiction
@@ -37,6 +36,7 @@ def ask(request: AskRequest) -> AskResponse:
     logger.info("POST /ask | question=%s", request.question[:80])
     try:
         result = answer_question(request.question)
+        append_interaction(result)
         return AskResponse(**result)
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

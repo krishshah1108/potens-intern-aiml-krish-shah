@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 .pytest_cache/
 .mypy_cache/
-.ruff_cache/
 chroma_db/
 *.egg-info/
 .venv/
@@ -12,11 +11,4 @@ venv/
 dist/
 build/
 .streamlit/secrets.toml
-.venv-test/
-pip_install_log.txt
-app/evaluation/eval_results.json
-documents/Potens_Intern_Take_Home_2026.pdf
-documents/multilingual_notice.pdf
-.venv-test/
-__pycache__/
-.pytest_cache/
+documents/*.pdf

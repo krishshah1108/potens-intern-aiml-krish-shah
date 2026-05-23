@@ -16,9 +16,7 @@ async def lifespan(app: FastAPI):
     setup_logging()
     store = get_vector_store()
     if store.count == 0:
-        logger.info("Vector store empty — running initial ingestion")
-        results = ingest_directory()
-        logger.info("Initial ingestion: %d files processed", len(results))
+        logger.info("Vector store empty — ingest PDFs via POST /ingest or Streamlit")
     else:
         logger.info("Vector store ready with %d chunks", store.count)
     yield

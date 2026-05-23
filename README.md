@@ -1,78 +1,18 @@
 # potens-intern-aiml-techiekrish
 
-**Document Q&A with Citations** — A focused, production-aware RAG system for the Potens IT Services AI/ML Engineer Internship take-home.
+**Document Q&A with Citations** — Focused, production-aware RAG for Potens IT Services.
 
-Built for **reliability**, **grounded answers**, and **retrieval transparency** — not feature breadth.
+Built for **reliability**, **grounded answers**, and **full pipeline transparency**.
 
 ---
 
 ## Project Overview
 
-This repository implements a trustworthy retrieval-augmented generation (RAG) pipeline over company policy documents. The system:
-
-- Answers questions in **English, Hindi, Gujarati, and Marathi** (response in the query language)
-- Returns **grounded answers** with explicit citations
-- **Refuses** when evidence is weak (anti-hallucination)
-- Exposes **retrieval debug** data (chunks, similarity scores, sources)
-- Supports **contradiction analysis** between two documents on a topic
-
-**Design intent:** Demonstrate engineering judgment under realistic time constraints — a dependable pipeline reviewers can trust, not a tutorial stack with every optional module enabled.
-
----
-
-## Features
-
-| Capability | Implementation |
-|------------|----------------|
-| Ingestion | PDF load, recursive chunking, metadata preservation |
-| Retrieval | ChromaDB + `paraphrase-multilingual-MiniLM-L12-v2` |
-| Generation | Gemini 2.5 Flash with strict context-only prompts |
-| Citations | Source file, page, chunk ID, supporting snippet |
-| Safety | Similarity threshold + insufficient-information refusal |
-| API | FastAPI (`/ask`, `/contradict`, `/health`, ingest) |
-| UI | Streamlit with retrieval debug panel |
-| Evaluation | 20-question dataset + metrics (hit@k, MRR, threshold, refusals) |
-
-**Intentionally not implemented:** reranking, hybrid BM25 + vector search, OCR, agents, Redis, Docker, auth, cloud deployment.
-
----
-
-## Architecture
-
-```mermaid
-flowchart TB
-    subgraph UI
-        ST[Streamlit UI]
-    end
-
-    subgraph API
-        FA[FastAPI]
-        ASK["POST /ask"]
-        CON["POST /contradict"]
-        HLTH["GET /health"]
-    end
-
-    subgraph RAG
-        LANG[Language detect + translate]
-        RET[Semantic retrieval top-k]
-        THR[Similarity threshold]
-        LLM[Gemini 2.5 Flash]
-        CITE[Citation formatter]
-    end
-
-    subgraph Ingestion
-        PDF[PDF loader]
-        CHK[RecursiveCharacterTextSplitter]
-        EMB[MiniLM embeddings]
-        CHROMA[(ChromaDB)]
-    end
-
-    ST --> FA
-    FA --> ASK & CON & HLTH
-    ASK --> LANG --> RET --> CHROMA
-    RET --> THR --> LLM --> CITE
-    PDF --> CHK --> EMB --> CHROMA
-```
+- Multilingual **queries** (English, Hindi, Gujarati, Marathi) over an **English PDF** corpus
+- Grounded answers with **citations** (source, page, chunk ID, snippet)
+- **Refusal** when retrieval evidence is weak
+- **Streamlit UI** shows the complete RAG flow per question
+- Each `/ask` interaction is appended to `app/evaluation/eval_dataset.json` for debugging
 
 ---
 
@@ -81,300 +21,131 @@ flowchart TB
 ```
 project-root/
 ├── app/
-│   ├── api/              # FastAPI routes and schemas
-│   ├── rag/              # Embeddings, ChromaDB, retrieval, scoring
+│   ├── api/              # FastAPI routes
+│   ├── rag/              # Embeddings, ChromaDB, retrieval
 │   ├── ingestion/        # PDF load, chunking, pipeline
-│   ├── evaluation/       # Dataset and eval script
-│   ├── prompts/          # Grounded and contradiction prompts
+│   ├── evaluation/       # Interaction log (eval_dataset.json)
+│   ├── prompts/          # LLM prompt templates
 │   ├── utils/            # Config, logging, citations
 │   └── services/         # QA, LLM, language, contradiction
-├── documents/            # PDF corpus (sample policies + optional uploads)
-├── chroma_db/            # Persistent vectors (generated locally)
-├── streamlit_app/        # Streamlit UI
-├── scripts/              # Sample PDF generator, Windows setup helper
-├── tests/
-├── examples/
+├── documents/            # Place PDFs here, then ingest
+├── chroma_db/            # Vector store (generated locally)
+├── streamlit_app/        # UI with full pipeline visibility
 ├── main.py
 ├── requirements.txt
 ├── .env.example
-├── AI_USE_LOG.md
 └── README.md
 ```
 
 ---
 
-## Setup Instructions
-
-**Prerequisites:** Python 3.10+, [Gemini API key](https://aistudio.google.com/apikey)
+## Setup
 
 ```bash
-git clone https://github.com/<your-username>/potens-intern-aiml-techiekrish.git
-cd potens-intern-aiml-techiekrish
-
 python -m venv .venv
-# Windows:  .venv\Scripts\activate
-# macOS/Linux:  source .venv/bin/activate
-
+.venv\Scripts\activate          # Windows
 pip install -r requirements.txt
+copy .env.example .env          # set GEMINI_API_KEY
+```
 
-copy .env.example .env    # Windows
-# cp .env.example .env    # macOS/Linux
-# Set GEMINI_API_KEY in .env
+Place PDFs in `documents/`, then:
 
-python scripts/generate_sample_documents.py
-
-python main.py
-# New terminal:
+```bash
+python main.py                  # API — ingests if chroma_db is empty
 streamlit run streamlit_app/app.py
 ```
 
-**Windows helper:** `.\scripts\run_setup.ps1`
+---
 
-**Expected setup time:** Under 10 minutes after dependencies are cached (first embedding model download ~400MB).
+## Fresh testing (clean slate)
 
-### Troubleshooting (Windows)
+```powershell
+Remove-Item documents\*.pdf -Force -ErrorAction SilentlyContinue
+Remove-Item chroma_db\* -Recurse -Force -ErrorAction SilentlyContinue
+# Reset interaction log:
+# app/evaluation/eval_dataset.json should contain: []
+```
 
-If ChromaDB or ONNX fails on import, use a **fresh venv** with Python 3.10/3.11, or run under **WSL2**. Large wheels (`torch`, `chromadb`) can take 10–20 minutes to install with little console output — that is normal.
+Upload PDFs via Streamlit sidebar or copy files into `documents/` and click **Re-ingest all**.
 
 ---
 
-## API Endpoints
+## Streamlit — full pipeline per question
 
-### `GET /health`
+1. **Your question** (with detected language)
+2. **Retrieval** — English query, all chunks, scores, threshold flags
+3. **Prompts** — system + user prompt (with context block)
+4. **LLM response**
+5. **Citations**
+6. Confirmation that the trace was saved to `eval_dataset.json`
 
-Returns API status and indexed chunk count.
+Use the **Interaction log** tab to inspect all past runs as JSON.
 
-### `POST /ask`
+---
 
-**Request**
-```json
-{ "question": "How many days of annual leave are provided?" }
-```
+## Interaction log (`eval_dataset.json`)
 
-**Response**
-```json
-{
-  "answer": "...",
-  "citations": [
-    {
-      "label": "[Source: leave_policy.pdf | Page 1 | Chunk abc_3]",
-      "source_file": "leave_policy.pdf",
-      "page_number": "1",
-      "chunk_id": "abc_3",
-      "snippet": "Full-time employees receive twenty (20) days..."
-    }
-  ],
-  "confidence_score": 0.72,
-  "retrieved_chunks": []
-}
-```
+Path: `app/evaluation/eval_dataset.json`
 
-### `POST /contradict`
+Each `POST /ask` appends one record:
 
-**Request**
-```json
-{
-  "document_1": "leave_policy.pdf",
-  "document_2": "hr_handbook_excerpt.pdf",
-  "topic": "annual leave entitlement"
-}
-```
+| Field | Content |
+|-------|---------|
+| `question` | Original user query |
+| `retrieval` | All chunks, scores, threshold filter, English retrieval query |
+| `prompts` | System and user prompts |
+| `llm_response` | Final answer |
+| `citations` | References with snippets |
+| `refused_insufficient_evidence` | Safe refusal flag |
+| `latency_seconds` | End-to-end timing |
 
-**Response**
-```json
-{
-  "conflict": true,
-  "reasoning": "Document A states 20 days while Document B states 18 days...",
-  "evidence": []
-}
-```
+This is an **explainability log**, not a labeled accuracy benchmark.
 
-### `POST /ingest` and `POST /ingest/upload`
+---
 
-Re-index all PDFs in `documents/` or upload a single PDF.
+## API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Status and chunk count |
+| `POST /ask` | Full trace + logging |
+| `POST /contradict` | Compare two documents on a topic |
+| `POST /ingest` | Re-index all PDFs in `documents/` |
+| `POST /ingest/upload` | Upload one PDF |
 
 ---
 
 ## Technology Choices
 
-| Component | Choice | Why |
-|-----------|--------|-----|
-| Vector DB | **ChromaDB** | Lightweight persistent storage, minimal setup, metadata-friendly citations |
-| LLM | **Gemini 2.5 Flash** | Fast inference, strong multilingual performance, practical free tier |
-| Embeddings | **paraphrase-multilingual-MiniLM-L12-v2** | Cross-lingual semantic search; runs locally |
-| Chunking | **RecursiveCharacterTextSplitter** | Overlapping recursive splits preserve semantic boundaries |
-| Backend | **FastAPI** | Typed APIs, easy testing |
-| UI | **Streamlit** | Professional UI without frontend boilerplate |
+| Component | Choice |
+|-----------|--------|
+| Vector DB | ChromaDB |
+| LLM | Gemini 2.5 Flash (`google-genai`) |
+| Embeddings | paraphrase-multilingual-MiniLM-L12-v2 |
+| Chunking | RecursiveCharacterTextSplitter (800 / 150 overlap) |
+| Backend | FastAPI |
+| UI | Streamlit |
 
 ---
 
-## Chunking Strategy
+## Hallucination prevention
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| `chunk_size` | 800 | Enough context for policy clauses; small enough for precise citations |
-| `chunk_overlap` | 150 | ~19% overlap reduces information loss at split boundaries |
-
-**Why this configuration:**
-
-- **Semantic continuity** — overlap keeps sentences split across chunks recoverable
-- **Retrieval quality** — chunk size tuned for embedding match specificity
-- **Citation precision** — evidence maps cleanly to `source_file`, `page_number`, `chunk_id`
-- **Context preservation** — recursive separators respect paragraphs and sentences
-
-Every chunk stores metadata: `source_file`, `page_number`, `chunk_id`, `document_id`, `language`.
-
----
-
-## Retrieval Strategy
-
-1. Detect query language (`langdetect`)
-2. Translate query to **English** for retrieval (translation boundary)
-3. Embed with multilingual MiniLM; search ChromaDB (cosine, top-k = 5)
-4. Drop chunks below similarity threshold (default **0.45**)
-5. Build numbered context for the LLM
-6. Generate answer in the **original query language**
-
-**No reranking or hybrid BM25** — deliberate simplicity for a reliable 24-hour scope.
-
----
-
-## Hallucination Prevention
-
-| Layer | Mechanism |
-|-------|-----------|
-| Retrieval | Similarity threshold filters weak evidence |
-| Prompting | Answer only from provided context; never invent facts |
-| Refusal | Fixed insufficient-information message when evidence is inadequate |
-| Confidence | Heuristic: 70% max similarity + 30% support ratio |
-| UI | Low-confidence warning and retrieval debug panel |
-
-**Refusal message:**
-
-> *The provided documents do not contain enough information to answer this question confidently.*
-
----
-
-## Multilingual Support
-
-**Supported:** English (`en`), Hindi (`hi`), Gujarati (`gu`), Marathi (`mr`)
-
-**Approach (intentionally simple):**
-
-1. Detect query language  
-2. Translate query to English for retrieval  
-3. Generate the answer in the original language  
-
-This **translation-boundary** design was chosen for reliability and speed within assignment constraints. Multilingual embeddings still help cross-lingual similarity; English retrieval queries keep policy-style search consistent when most source PDFs are in English.
-
----
-
-## Evaluation Strategy
-
-Dataset: `app/evaluation/eval_dataset.json` — **20 Q&A pairs** with ground truth (`expected_source`, `expected_keywords`, `expect_refusal`). Questions mix **English, Hindi, and Marathi** against an **English PDF corpus**.
-
-```bash
-python scripts/generate_sample_documents.py   # 10 policies, ~10-15 pages each
-python main.py                                 # ingest on first run
-python -m app.evaluation.run_eval              # retrieval metrics only (no LLM quota)
-python -m app.evaluation.run_eval --full       # + grounded answers (~13s between calls)
-```
-
-**Metrics:**
-
-| Metric | Description |
-|--------|-------------|
-| Hit@1 / @3 / @5 | Expected source in top-k retrieved chunks |
-| MRR | Mean reciprocal rank of expected source |
-| Threshold pass | Expected source survives similarity filter |
-| Keyword match | Grounded answer contains expected terms |
-| Refusal accuracy | Out-of-corpus questions correctly refused |
-
-Manual test prompts: `examples/sample_questions.md`
-
-Results: `app/evaluation/eval_results.json` (gitignored).
-
-**Contradiction pairs in corpus:** leave (20 vs 18 days), remote work (3 vs 2 days), password rotation (90 vs 60 days), client retention (7 vs 5 years).
-
----
-
-## Tradeoffs
-
-| Decision | Benefit | Cost |
-|----------|---------|------|
-| No reranking | Simpler, faster, easier to debug | Lower precision on ambiguous queries |
-| No hybrid BM25 | Less infrastructure | Weaker exact keyword matching |
-| Translation for retrieval | Stable English retrieval | Translation boundary errors |
-| Heuristic confidence | Transparent, explainable | Not a calibrated probability |
-| Local embeddings | No embedding API cost | First-run model download |
-| ChromaDB (local) | Zero DevOps for take-home | Not production-scale alone |
+- Similarity threshold on retrieved chunks
+- Strict context-only prompts
+- Fixed insufficient-information refusal message
+- Heuristic confidence score
 
 ---
 
 ## Limitations
 
-- **No OCR** — scanned PDFs without a text layer will not index well  
-- **Contradiction detection** may miss implicit semantic conflicts  
-- **Confidence** is heuristic, not statistically calibrated  
-- **Multilingual quality** depends on translation and LLM fluency  
-- **PDF text extraction** varies by how the PDF was produced  
-- **Network** required for Gemini API and Google Translate (`deep-translator`)
-
----
-
-## Future Improvements
-
-Documented only — not implemented in this submission:
-
-- Cross-encoder reranking  
-- Hybrid BM25 + vector retrieval  
-- OCR for scanned documents  
-- pgvector or managed vector DB  
-- Streaming responses  
-- Authentication and multi-tenant isolation  
-- Production deployment with observability  
-
----
-
-## Testing
-
-```bash
-pytest tests/ -v
-```
-
-Covers chunk metadata, citations, retrieval threshold, multilingual helpers, API health, and refusal handling.
-
----
-
-## Logging
-
-Structured logs via Python `logging`: queries, retrieval scores, chunk counts, latency, errors. Set `LOG_LEVEL` in `.env` (default: `INFO`).
-
----
-
-## Suggested Commit History
-
-```
-initialize fastapi project structure
-implement pdf ingestion pipeline
-add chunk metadata preservation
-integrate chromadb semantic retrieval
-implement grounded answer prompting
-add citation formatting system
-implement multilingual translation flow
-build streamlit retrieval debugging interface
-add evaluation dataset and metrics
-document architecture tradeoffs in README
-```
+- English PDFs only (queries may be multilingual)
+- No OCR, reranking, or hybrid BM25
+- Gemini free tier rate limits apply
+- `eval_dataset.json` grows with each question — clear it when restarting tests
 
 ---
 
 ## AI Use Log
 
 See [AI_USE_LOG.md](AI_USE_LOG.md).
-
----
-
-## Author
-
-Krish Shah — Potens IT Services AI/ML Engineer Internship Take-Home

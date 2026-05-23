@@ -1,16 +1,19 @@
 """
-Potens Document Q&A — Streamlit UI
+Potens Document Q&A — Streamlit UI (full pipeline transparency)
 
 Run: streamlit run streamlit_app/app.py
-Requires FastAPI backend at http://localhost:8000
+Requires: python main.py
 """
 
+import json
 import os
+from pathlib import Path
 
 import httpx
 import streamlit as st
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+LOG_PATH = Path(__file__).resolve().parents[1] / "app" / "evaluation" / "eval_dataset.json"
 
 st.set_page_config(
     page_title="Potens Document Q&A",
@@ -19,12 +22,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Minimal professional styling
 st.markdown(
     """
     <style>
-    .main { max-width: 1100px; }
-    .stMetric { background: #f8f9fa; padding: 0.5rem; border-radius: 4px; }
+    .main { max-width: 1200px; }
     .citation-box {
         background: #f1f3f5;
         border-left: 3px solid #495057;
@@ -32,7 +33,13 @@ st.markdown(
         margin: 0.5rem 0;
         font-size: 0.9rem;
     }
-    h1 { font-weight: 600; color: #212529; }
+    .chunk-box {
+        background: #fafafa;
+        border: 1px solid #dee2e6;
+        padding: 0.6rem 0.8rem;
+        margin: 0.4rem 0;
+        border-radius: 4px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -63,7 +70,69 @@ def api_upload(file_bytes: bytes, filename: str) -> dict:
         return r.json()
 
 
-# Sidebar
+def render_ask_flow(data: dict) -> None:
+    st.subheader("1. Your question")
+    st.info(data.get("question", ""))
+    st.caption(f"Detected language: **{data.get('query_language', 'en')}**")
+
+    retrieval = data.get("retrieval", {})
+    st.subheader("2. Retrieval")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Chunks retrieved", retrieval.get("chunks_retrieved", 0))
+    c2.metric("Above threshold", retrieval.get("chunks_above_threshold", 0))
+    c3.metric("Confidence", f"{data.get('confidence_score', 0):.0%}")
+    c4.metric("Latency", f"{data.get('latency_seconds', 0)}s")
+
+    st.markdown("**English retrieval query (translation boundary):**")
+    st.code(retrieval.get("retrieval_query_english", ""), language=None)
+    st.caption(
+        f"top_k={retrieval.get('top_k')} · threshold={retrieval.get('similarity_threshold')} · "
+        f"{retrieval.get('answer_language_instruction', '')}"
+    )
+
+    st.markdown("**All retrieved chunks**")
+    for ch in retrieval.get("all_retrieved_chunks", []):
+        flag = "✓ used" if ch.get("used_in_llm_context") else ("✓ above thr" if ch.get("above_threshold") else "below thr")
+        st.markdown(
+            f'<div class="chunk-box">'
+            f"<strong>{ch.get('source_file')}</strong> · p.{ch.get('page_number')} · "
+            f"`{ch.get('chunk_id')}` · sim **{ch.get('similarity', 0):.3f}** · {flag}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        st.text(ch.get("text", "")[:600] + ("…" if len(ch.get("text", "")) > 600 else ""))
+
+    prompts = data.get("prompts", {})
+    st.subheader("3. Prompts sent to LLM")
+    with st.expander("System prompt", expanded=True):
+        st.text(prompts.get("system_prompt", ""))
+    with st.expander("User prompt (context + question)", expanded=True):
+        st.text(prompts.get("user_prompt") or "(not sent — insufficient retrieval evidence)")
+
+    st.subheader("4. LLM response")
+    if data.get("refused_insufficient_evidence"):
+        st.warning("Insufficient evidence — safe refusal")
+    st.write(data.get("llm_response", data.get("answer", "")))
+    if data.get("llm_latency_seconds"):
+        st.caption(f"LLM latency: {data.get('llm_latency_seconds')}s")
+
+    st.subheader("5. Citations")
+    citations = data.get("citations", [])
+    if not citations:
+        st.info("No citations for this response.")
+    for cite in citations:
+        st.markdown(
+            f'<div class="citation-box">'
+            f"<strong>{cite.get('label', '')}</strong><br>"
+            f'<em>"{cite.get("snippet", "")}"</em>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.subheader("6. Logged to eval_dataset.json")
+    st.caption(f"Each ask appends a full trace to `{LOG_PATH}`")
+
+
 with st.sidebar:
     st.header("System")
     try:
@@ -75,20 +144,17 @@ with st.sidebar:
         st.caption("Start backend: `python main.py`")
 
     st.divider()
-    st.header("Upload document")
-    uploaded = st.file_uploader("PDF only", type=["pdf"])
-    if uploaded and st.button("Ingest uploaded PDF"):
+    st.header("Documents")
+    uploaded = st.file_uploader("Upload PDF", type=["pdf"])
+    if uploaded and st.button("Ingest PDF"):
         with st.spinner("Indexing..."):
             try:
                 result = api_upload(uploaded.read(), uploaded.name)
-                st.success(
-                    f"Indexed {result.get('chunks_indexed', 0)} chunks from "
-                    f"{result.get('source_file')}"
-                )
+                st.success(f"Indexed {result.get('chunks_indexed', 0)} chunks")
             except Exception as exc:
                 st.error(str(exc))
 
-    if st.button("Re-ingest all documents"):
+    if st.button("Re-ingest all in documents/"):
         with st.spinner("Re-indexing..."):
             try:
                 results = api_post("/ingest", {})
@@ -96,71 +162,43 @@ with st.sidebar:
             except Exception as exc:
                 st.error(str(exc))
 
-# Main
-st.title("Potens Document Q&A")
-st.caption(
-    "Grounded answers with citations · English · Hindi · Gujarati · Marathi"
-)
+    st.divider()
+    st.header("Interaction log")
+    if LOG_PATH.exists():
+        try:
+            records = json.loads(LOG_PATH.read_text(encoding="utf-8"))
+            st.caption(f"{len(records)} interactions logged")
+        except json.JSONDecodeError:
+            st.caption("Log file empty or invalid")
+    else:
+        st.caption("No interactions yet")
 
-tab_ask, tab_contradict = st.tabs(["Ask a question", "Contradiction analysis"])
+st.title("Potens Document Q&A")
+st.caption("Full RAG pipeline visibility · English PDFs · multilingual queries")
+
+tab_ask, tab_contradict, tab_log = st.tabs(["Ask", "Contradiction", "Interaction log"])
 
 with tab_ask:
     question = st.text_area(
         "Your question",
-        placeholder="Ask in English, Hindi, Gujarati, or Marathi...",
-        height=100,
+        placeholder="English, Hindi, Gujarati, or Marathi...",
+        height=90,
     )
-    if st.button("Get answer", type="primary", disabled=not question.strip()):
-        with st.spinner("Retrieving and generating..."):
+    if st.button("Run RAG pipeline", type="primary", disabled=not question.strip()):
+        with st.spinner("Retrieve → prompt → generate..."):
             try:
                 data = api_post("/ask", {"question": question.strip()})
             except Exception as exc:
-                st.error(f"Request failed: {exc}")
+                st.error(str(exc))
                 st.stop()
-
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.subheader("Answer")
-            st.write(data.get("answer", ""))
-        with col2:
-            conf = data.get("confidence_score", 0)
-            st.metric("Confidence", f"{conf:.0%}")
-            if conf < 0.45:
-                st.warning("Low confidence — verify citations")
-
-        st.subheader("Citations")
-        citations = data.get("citations", [])
-        if not citations:
-            st.info("No citations — answer may be insufficient-evidence response.")
-        for cite in citations:
-            st.markdown(
-                f'<div class="citation-box">'
-                f"<strong>{cite.get('label', '')}</strong><br>"
-                f'<em>"{cite.get("snippet", "")}..."</em>'
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        with st.expander("Retrieval debug (transparency)", expanded=False):
-            chunks = data.get("retrieved_chunks", [])
-            if not chunks:
-                st.write("No chunks retrieved.")
-            for ch in chunks:
-                st.markdown(
-                    f"**{ch.get('source_file')}** · Page {ch.get('page_number')} · "
-                    f"Chunk `{ch.get('chunk_id')}` · "
-                    f"Similarity: **{ch.get('similarity', 0):.3f}**"
-                )
-                st.text(ch.get("text_preview", ""))
-                st.divider()
+        render_ask_flow(data)
 
 with tab_contradict:
-    st.caption("Compare two documents on a specific topic")
     c1, c2, c3 = st.columns(3)
     with c1:
-        doc1 = st.text_input("Document 1 filename", placeholder="leave_policy.pdf")
+        doc1 = st.text_input("Document 1", placeholder="leave_policy.pdf")
     with c2:
-        doc2 = st.text_input("Document 2 filename", placeholder="hr_handbook_excerpt.pdf")
+        doc2 = st.text_input("Document 2", placeholder="hr_handbook_excerpt.pdf")
     with c3:
         topic = st.text_input("Topic", placeholder="annual leave entitlement")
 
@@ -169,31 +207,27 @@ with tab_contradict:
             try:
                 result = api_post(
                     "/contradict",
-                    {
-                        "document_1": doc1.strip(),
-                        "document_2": doc2.strip(),
-                        "topic": topic.strip(),
-                    },
+                    {"document_1": doc1.strip(), "document_2": doc2.strip(), "topic": topic.strip()},
                 )
             except Exception as exc:
                 st.error(str(exc))
                 st.stop()
-
         if result.get("conflict"):
             st.error("Conflict detected")
         else:
-            st.success("No explicit conflict detected")
-
-        st.subheader("Reasoning")
+            st.success("No explicit conflict")
         st.write(result.get("reasoning", ""))
+        for item in result.get("evidence", []):
+            if isinstance(item, dict):
+                st.markdown(f"- **{item.get('document', '')}** — {item.get('quote', '')}")
 
-        evidence = result.get("evidence", [])
-        if evidence:
-            st.subheader("Evidence")
-            for item in evidence:
-                if isinstance(item, dict):
-                    st.markdown(f"- **{item.get('document', '')}** ({item.get('chunk_id', '')})")
-                    st.text(item.get("quote", ""))
-
-st.divider()
-st.caption("Potens IT Services · Internship take-home · Grounded RAG")
+with tab_log:
+    st.caption(f"File: `{LOG_PATH}`")
+    if LOG_PATH.exists():
+        try:
+            records = json.loads(LOG_PATH.read_text(encoding="utf-8"))
+            st.json(records)
+        except Exception as exc:
+            st.error(str(exc))
+    else:
+        st.info("No interactions logged yet. Ask a question in the Ask tab.")

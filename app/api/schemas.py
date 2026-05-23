@@ -1,5 +1,7 @@
 """Pydantic request/response models."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -25,10 +27,18 @@ class RetrievedChunkResponse(BaseModel):
 
 
 class AskResponse(BaseModel):
+    question: str
     answer: str
+    llm_response: str
     citations: list[CitationResponse]
     confidence_score: float
     retrieved_chunks: list[RetrievedChunkResponse]
+    query_language: str
+    latency_seconds: float | None = None
+    llm_latency_seconds: float | None = None
+    refused_insufficient_evidence: bool = False
+    retrieval: dict[str, Any]
+    prompts: dict[str, Any]
 
 
 class ContradictRequest(BaseModel):
@@ -37,16 +47,10 @@ class ContradictRequest(BaseModel):
     topic: str = Field(..., min_length=1, description="Topic to compare")
 
 
-class EvidenceItem(BaseModel):
-    document: str | None = None
-    chunk_id: str | None = None
-    quote: str | None = None
-
-
 class ContradictResponse(BaseModel):
     conflict: bool
     reasoning: str
-    evidence: list[dict] | list[EvidenceItem] = []
+    evidence: list[dict] = []
 
 
 class IngestResponse(BaseModel):
