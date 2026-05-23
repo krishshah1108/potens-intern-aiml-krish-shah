@@ -12,7 +12,7 @@ Built for **reliability**, **grounded answers**, and **full pipeline transparenc
 - Grounded answers with **citations** (source, page, chunk ID, snippet)
 - **Refusal** when retrieval evidence is weak
 - **Streamlit UI** shows the complete RAG flow per question
-- Each `/ask` interaction is appended to `app/evaluation/eval_dataset.json` for debugging
+- Each `/ask` interaction is appended to `evaluation/eval_dataset.json` (project root) for debugging
 
 ---
 
@@ -24,11 +24,12 @@ project-root/
 │   ├── api/              # FastAPI routes
 │   ├── rag/              # Embeddings, ChromaDB, retrieval
 │   ├── ingestion/        # PDF load, chunking, pipeline
-│   ├── evaluation/       # Interaction log (eval_dataset.json)
+│   ├── evaluation/       # Q&A pipeline modules (logging only)
 │   ├── prompts/          # LLM prompt templates
 │   ├── utils/            # Config, logging, citations
 │   └── services/         # QA, LLM, language, contradiction
 ├── documents/            # Place PDFs here, then ingest
+├── evaluation/           # Interaction log: eval_dataset.json (each /ask)
 ├── chroma_db/            # Vector store (generated locally)
 ├── streamlit_app/        # UI with full pipeline visibility
 ├── main.py
@@ -63,10 +64,29 @@ streamlit run streamlit_app/app.py
 Remove-Item documents\*.pdf -Force -ErrorAction SilentlyContinue
 Remove-Item chroma_db\* -Recurse -Force -ErrorAction SilentlyContinue
 # Reset interaction log:
-# app/evaluation/eval_dataset.json should contain: []
+# evaluation/eval_dataset.json should contain: []
 ```
 
 Upload PDFs via Streamlit sidebar or copy files into `documents/` and click **Re-ingest all**.
+
+### Education Policy & Research corpus (RAG stress-test)
+
+Generate six long-form PDFs (research + policy) with overlapping entities, cross-references, tables, clauses, and annexures:
+
+```bash
+python scripts/generate_education_dataset.py
+```
+
+| File | Type | Pages (approx.) |
+|------|------|-----------------|
+| `edu_research_learning_outcomes_study.pdf` | Research | 15 |
+| `edu_research_online_education_effectiveness.pdf` | Research | 15 |
+| `edu_research_stem_curriculum_evaluation.pdf` | Research | 15 |
+| `edu_policy_national_curriculum_framework.pdf` | Policy | 14 |
+| `edu_policy_student_data_privacy.pdf` | Policy | 14 |
+| `edu_policy_teacher_training_certification.pdf` | Policy | 14 |
+
+Sample evaluation questions: `examples/education_sample_questions.md`. Re-ingest after generation.
 
 ---
 
@@ -85,7 +105,7 @@ Use the **Interaction log** tab to inspect all past runs as JSON.
 
 ## Interaction log (`eval_dataset.json`)
 
-Path: `app/evaluation/eval_dataset.json`
+Path: `evaluation/eval_dataset.json` (at project root, not inside `app/`)
 
 Each `POST /ask` appends one record:
 

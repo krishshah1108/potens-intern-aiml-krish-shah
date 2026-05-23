@@ -49,9 +49,12 @@ def chunk_pages(
 
         for split in splits:
             chunk_counter += 1
+            chunk_text = (
+                f"Source: {page['source_file']} | page {page['page_number']}. {split}"
+            )
             chunks.append(
                 {
-                    "text": split,
+                    "text": chunk_text,
                     "metadata": {
                         "source_file": page["source_file"],
                         "page_number": page["page_number"],

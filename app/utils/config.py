@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     chroma_persist_dir: str = "chroma_db"
     documents_dir: str = "documents"
     collection_name: str = "potens_docs"
-    top_k: int = 5
+    top_k: int = 8
+    retrieval_candidates: int = 25
     similarity_threshold: float = 0.45
     chunk_size: int = 800
     chunk_overlap: int = 150
@@ -35,6 +36,11 @@ class Settings(BaseSettings):
     @property
     def docs_path(self) -> Path:
         return PROJECT_ROOT / self.documents_dir
+
+    @property
+    def interaction_log_path(self) -> Path:
+        """Full Q&A traces from POST /ask (outside app/ for easy access)."""
+        return PROJECT_ROOT / "evaluation" / "eval_dataset.json"
 
 
 settings = Settings()

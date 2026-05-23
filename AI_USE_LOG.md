@@ -26,7 +26,7 @@ Transparency log for tools used while building this internship take-home project
 - Multilingual translation-boundary approach (simplicity over complexity)
 - Hallucination refusal strategy (threshold + strict prompts)
 - Intentional contradiction pair: `leave_policy.pdf` vs `hr_handbook_excerpt.pdf` (20 vs 18 leave days)
-- Interaction log schema for app/evaluation/eval_dataset.json
+- Interaction log schema for evaluation/eval_dataset.json (project root)
 
 ## Honest Notes
 

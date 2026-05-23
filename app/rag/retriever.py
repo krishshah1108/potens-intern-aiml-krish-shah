@@ -20,8 +20,10 @@ def retrieve(
 ) -> list[dict[str, Any]]:
     where = {"source_file": source_filter} if source_filter else None
     store = get_vector_store()
-    chunks = store.query(query, top_k=top_k or settings.top_k, where=where)
-    return chunks
+    limit = top_k or settings.top_k
+    candidate_k = max(limit, settings.retrieval_candidates)
+    chunks = store.query(query, top_k=candidate_k, where=where)
+    return chunks[:limit]
 
 
 __all__ = [

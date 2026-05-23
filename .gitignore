@@ -11,4 +11,4 @@ venv/
 dist/
 build/
 .streamlit/secrets.toml
-documents/*.pdf
+scripts/
